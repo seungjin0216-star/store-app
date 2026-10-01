@@ -9,9 +9,14 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="백석 매장">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- 🔴 구글 폰트를 뺐습니다 (2026-10-01 · 사장님 확인)
+     IBM Plex Sans KR 은 한글이라 조각 282개로 쪼개져 있습니다.
+     한글 화면이면 수십 개를 받고, 굵기 3종이라 ×3 입니다.
+     ⚠️ 용량보다 **요청 횟수**가 문제였습니다. 매장 와이파이에서 수십 번 왕복하는
+        동안 화면이 멎었습니다. 게다가 <link rel=stylesheet> 는 렌더를 막는 자리입니다.
+     → 아이폰은 애플 산돌고딕, 갤럭시는 노토산스를 씁니다. 둘 다 깔끔한 한글 글꼴입니다.
+     ⚠️ 글꼴을 다시 넣고 싶으면 body 의 font-family 만 바꾸면 됩니다.
+        다만 「주춤거리면 아무도 안 쓴다」가 이 앱의 기준입니다. -->
 <style>
 :root{
   --paper:#F4F6F5; --surface:#FFFFFF; --ink:#1C2529; --muted:#5E6B70; --line:#DCE2E0;
@@ -33,8 +38,10 @@
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
 body{height:100%;margin:0;background:var(--paper);color:var(--ink);
-  font-family:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;word-break:keep-all}
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",
+              "Malgun Gothic",system-ui,"Helvetica Neue",sans-serif;
+  font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;word-break:keep-all;
+  -webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer}
 .num{font-variant-numeric:tabular-nums}
 .wrap{max-width:480px;margin:0 auto}
@@ -202,7 +209,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-01-v1';
+const APP_VERSION = '2026-10-01-v2';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -343,6 +350,20 @@ const API = {
   /* 오늘 화면 — 어제 데이터
      · 넘어온 것: 마감 서버 (이미 있음)
      · 고기·발주·시재·대파·전달사항: 발주 서버 action=brief (서버에 추가하면 자동으로 뜸, 없으면 칸을 숨김) */
+  /* 🔴 어제 데이터 캐시 (2026-10-01 · 사장님 확인)
+     GAS 는 한동안 안 쓰면 깨어나는 데 2~5초가 걸립니다(콜드 스타트). 줄일 수 없습니다.
+     대신 **가립니다.** 지난번에 받은 값을 폰에 두었다가 열자마자 보여주고,
+     뒤에서 조용히 새로 받아 갱신합니다.
+     ⚠️ 같은 영업일 안에서는 값이 안 바뀌므로 안전합니다. 날이 바뀌면 버립니다. */
+  _cacheKey: 'jangsoo-brief-'+STORE.code,
+  readCache(){
+    try{ const o=JSON.parse(localStorage.getItem(this._cacheKey)||'null');
+      return (o && o.day===BD_KEY) ? o.data : null; }catch(e){ return null; }
+  },
+  writeCache(d){
+    try{ localStorage.setItem(this._cacheKey, JSON.stringify({day:BD_KEY,data:d})); }catch(e){}
+  },
+
   async yesterday(){
     if(!LIVE) return DEMO_Y;
     const [c,b0] = await Promise.all([
@@ -350,11 +371,18 @@ const API = {
       this.jsonp(STORE.orderGas,{action:'brief',date:BD_KEY,branch:STORE.branch},8000),
     ]);
     const b=(b0&&b0.ok)?b0:{};
-    return {
+    const d = {
       carry: ((c&&c.items)||[]).map(it=>typeof it==='string'?{id:it,label:it}:{id:it.id||it.label,label:it.label||it.id}),
       bossOrder:b.bossOrder||null, wondangOrder:b.wondangOrder||null, meatIn:b.meatIn||null,
       cashShort:(b.cashShort==null?null:b.cashShort), daepa:(b.daepa==null?null:b.daepa), notices:b.notices||null,
     };
+    /* ⚠️ 서버를 못 물어봤는데(c·b 둘 다 빈 답) 캐시가 있으면 캐시를 지킵니다.
+       빈 값으로 덮어쓰면 화면이 거꾸로 비어 버립니다. */
+    const 빈답 = !c && !(b0&&b0.ok);
+    const 캐시 = this.readCache();
+    if(빈답 && 캐시) return 캐시;
+    this.writeCache(d);
+    return d;
   },
 
   /* 영수증 — 기존 영수증 분석기와 같은 서버·같은 형식 */
@@ -944,6 +972,11 @@ document.addEventListener('input', e=>{
 /* ── 시작: 화면은 바로 띄우고, 어제 데이터는 뒤에서 채웁니다 ── */
 if(LIVE) $('#modePill').remove();
 $('#dateLabel').textContent = `백석점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[WD]}요일 · ${APP_VERSION}`;
+
+/* 🔴 캐시가 있으면 **그리기 전에** 넣습니다. 그래야 첫 화면부터 「오늘은」이 보입니다 */
+const 캐시된어제 = LIVE ? API.readCache() : null;
+if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
+
 go('t-today');
 API.yesterday().then(d=>{ Y=d; window.Y=d; rerender(); });
 if(LIVE){
