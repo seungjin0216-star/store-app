@@ -223,7 +223,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-01-v3';
+const APP_VERSION = '2026-10-01-v4';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -592,7 +592,7 @@ function rMeat(){
       <button class="big-btn" data-act="sendmeat" data-v="order">${m.sent.order?'다시 보내기':'발주 보내기'}</button>`;
   } else {
     el.innerHTML = seg
-    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>⚠️ 또 보내면 손익에 고기값이 두 번 잡힙니다. 잘못 넣었으면 사장님께 말씀해 주세요</span></div></div>`:'')
+    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
     + `<h2>오늘 들어온 양</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
       <div class="list">
         <div class="row"><span class="main">곱창</span>${valBtn('meat.recv.gc','보','곱창 입고')}</div>
@@ -951,8 +951,8 @@ document.addEventListener('click', async e=>{
     case 'chip': { const arr=get(b.dataset.path), v=b.dataset.v, i=arr.indexOf(v); i<0?arr.push(v):arr.splice(i,1); save(); rerender(); break; }
     case 'sendmeat': { const k=b.dataset.v, msg=meatMsg(k);
       if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
-      const 정정 = k==='order' && S.meat.sent.order;
-      openSheet(`<h2>${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 발주가 있습니다</b><span>이걸 보내면 업체에 「⚠️ 정정 — 앞서 보낸 발주 대신 이것」으로 갑니다</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
+      const 정정 = S.meat.sent[k];
+      openSheet(`<h2>${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 ${k==='order'?'발주':'입고'}가 있습니다</b><span>이걸 보내면 「⚠️ 정정 — 앞서 보낸 것 대신 이것」으로 갑니다${k==='recv'?'. 고기값도 이것으로만 잡힙니다':''}</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
     case 'sendmeatok': { const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
       await API.post(STORE.orderGas, k==='order'
         ? {type:'order',branch:STORE.meatBranch,gc_use:n(o.use),gc_done:n(o.done),gc_ing:n(o.ing),dc:n(o.dc),mc:o.mcMax?0:n(o.mc),mc_max:!!o.mcMax,extras:o.extras,date:realDateStr(),monday_delay:new Date().getDay()===1}
