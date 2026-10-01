@@ -60,7 +60,9 @@ h3{font-size:14px;color:var(--muted);font-weight:500;margin:16px 0 6px}
 .hint{color:var(--muted);font-size:14px;margin:0 0 10px}
 
 .list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line);width:100%;text-align:left;background:transparent;border-left:0;border-right:0;border-bottom:0;min-height:52px}
+/* ⚠️ box-sizing 을 직접 적습니다 (26-10-01) — 접히는 묶음(details) 안의 줄은 물려받지 못해
+   폭이 37px 넘쳐 🛒 가 잘렸습니다. 「마감체크 폰화면 밀림」의 원인 */
+.row{box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line);width:100%;text-align:left;background:transparent;border-left:0;border-right:0;border-bottom:0;min-height:52px}
 .row:first-child{border-top:0}
 .row .main{flex:1;min-width:0}
 .row .sub{display:block;font-size:13px;color:var(--muted)}
@@ -175,6 +177,18 @@ nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .two .big-btn{margin-top:0}
 
+.icon-btn.q{min-width:36px;font-weight:700;color:var(--accent)}
+/* ❓ 기준·방법 — 기존 마감 앱과 같은 꼴 */
+.man-step{margin-top:14px}.man-step:first-child{margin-top:4px}
+.man-img{width:100%;border-radius:12px;display:block;border:1px solid var(--line);background:var(--paper)}
+.man-cap{font-size:12px;color:var(--muted);margin:6px 2px 10px;text-align:center}
+.man-l{display:flex;gap:9px;margin-bottom:11px;align-items:flex-start}
+.man-n{flex:0 0 22px;height:22px;border-radius:50%;background:var(--char);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+.man-tx{flex:1;font-size:15px;line-height:1.65}
+.man-tt{font-weight:700;margin-bottom:3px}
+.man-bad{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--beef) 12%,var(--surface));font-size:14px}
+.man-why{margin-top:10px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--warm) 14%,var(--surface));font-size:14px}
+.man-txt{white-space:pre-wrap;font-size:15px;line-height:1.7}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--char);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
 .toast.show{opacity:1}
 
@@ -209,7 +223,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-01-v2';
+const APP_VERSION = '2026-10-01-v3';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -399,6 +413,38 @@ const API = {
   direct(분류,금액,날짜,항목명){ return this.post(STORE.receiptGas,{action:'direct',store:STORE.receiptStore,분류,금액,날짜,항목명}); },
 };
 
+/* ── ❓ 기준·방법 (26-10-01 · 사장님 「물음표 사라져서 못봄」) ──
+   🔴 원본은 **기존 마감 앱(closing-checklist/index.html)의 기준표 하나**입니다.
+      여기에 따로 적지 않습니다. 두 곳에 적으면 반드시 한쪽만 고치게 됩니다.
+      → 기존 앱 파일을 읽어 「const 기준표 = { … };」 덩어리만 꺼내 씁니다.
+   ⚠️ 사진도 기존 앱의 기준사진/ 폴더를 그대로 씁니다.
+   ⚠️ 못 읽으면 「?」 가 안 나올 뿐 나머지는 그대로 돕니다. 지난번 것을 폰에 둡니다. */
+const 기준원본 = 'https://seungjin0216-star.github.io/closing-checklist/';
+let 기준표 = null;
+try{ 기준표 = JSON.parse(localStorage.getItem('jangsoo-guide')||'null'); }catch(e){}
+async function load기준표(){
+  if(!LIVE) return;
+  try{
+    const t = await (await fetch(기준원본+'index.html',{cache:'no-cache'})).text();
+    const m = t.match(/const 기준표 = (\{[\s\S]*?\n\});/);
+    if(!m) return;
+    const g = new Function('return '+m[1])();
+    기준표 = g; try{ localStorage.setItem('jangsoo-guide', JSON.stringify(g)); }catch(e){}
+    if(cur==='t-close') rerender();
+  }catch(e){}
+}
+function 기준그리기(것){
+  const img = f=>`<img class="man-img" src="${기준원본}기준사진/${encodeURIComponent(f)}" loading="lazy" onerror="this.style.display='none'">`;
+  if(것 && typeof 것==='object' && 것.단계){
+    let n=0;
+    return 것.단계.map(s=>`<div class="man-step">${s.사진?img(s.사진):''}${s.사진&&s.캡션?`<div class="man-cap">${s.캡션}</div>`:''}${(s.줄||[]).map(l=>`<div class="man-l"><div class="man-n">${++n}</div><div class="man-tx">${l.t?`<div class="man-tt">${l.t}</div>`:''}${l.d||''}</div></div>`).join('')}</div>`).join('')
+      + (것.주의?`<div class="man-bad">🚫 ${것.주의}</div>`:'') + (것.왜?`<div class="man-why">⚠️ ${것.왜}</div>`:'');
+  }
+  const 글 = (것&&typeof 것==='object') ? (것.글||'') : (것||'');
+  const 사진 = (것&&typeof 것==='object'&&것.사진) ? 것.사진 : [];
+  return (글?`<div class="man-txt">${esc(글)}</div>`:`<p class="hint">아직 안 적었습니다.<br>사장님이 기준을 알려주시면 여기 넣겠습니다.</p>`) + 사진.map(img).join('');
+}
+
 /* ── 상태 (이 폰에만 저장, 날이 바뀌면 새로 시작) ──
    ⚠️ 마감 체크는 **일부러 폰마다 따로**입니다. 서버에 올리기만 하고 받아오지 않습니다.
       사장님 결정 (26-09-22): 「처음처럼 각자 체크하고 완료하는게 좋을듯」
@@ -527,7 +573,7 @@ function rMeat(){
   if(m.mode==='order'){
     const c=meatCalc();
     el.innerHTML = seg + (STORE.noMeatOrderDays.includes(WD)?`<div class="banner red"><span class="em">🚫</span><div><b>오늘은 고기 발주 없는 날</b><span>입력하지 않아도 됩니다</span></div></div>`:'') + (isMon?`<div class="banner warn"><span class="em">⚠️</span><div><b>월요일 발주 — 업체 화요일 휴무</b><span>저장해 두면 화요일 20:00에 자동 발송, 수요일 납품</span></div></div>`:'')
-    + (m.sent.order?`<div class="banner green"><span class="em">✅</span><div><b>${m.sent.order} 발주 보냄</b><span>고쳐서 다시 보내도 됩니다</span></div></div>`:'')
+    + (m.sent.order?`<div class="banner green"><span class="em">✅</span><div><b>오늘 고기 발주 나감 · ${m.sent.order}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 업체에 「⚠️ 정정」 문자로 갑니다</span></div></div>`:'')
     + `<h2>곱창 재고</h2><p class="hint">지금 남은 양을 보 단위로 적어 주세요.</p>
       <div class="list">
         <div class="row"><span class="main">쓰고 있는 것<span class="sub">현재 홀 사용 중</span></span>${valBtn('meat.order.use','보','쓰고 있는 곱창')}</div>
@@ -546,7 +592,7 @@ function rMeat(){
       <button class="big-btn" data-act="sendmeat" data-v="order">${m.sent.order?'다시 보내기':'발주 보내기'}</button>`;
   } else {
     el.innerHTML = seg
-    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>${m.sent.recv} 입고 보냄</b><span>고쳐서 다시 보내도 됩니다</span></div></div>`:'')
+    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>⚠️ 또 보내면 손익에 고기값이 두 번 잡힙니다. 잘못 넣었으면 사장님께 말씀해 주세요</span></div></div>`:'')
     + `<h2>오늘 들어온 양</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
       <div class="list">
         <div class="row"><span class="main">곱창</span>${valBtn('meat.recv.gc','보','곱창 입고')}</div>
@@ -642,10 +688,11 @@ function itemRow(id,label,opts={}){
   const c=S.close, on=!!c.checks[id], carried=!!c.carry[id];
   const inCart=!!S.food.srcs[id];
   const cart = 발주표[id] ? `<button class="icon-btn ${inCart?'on':''}" data-act="tocart" data-id="${id}" aria-pressed="${inCart}" aria-label="${label} 발주에 담기">🛒</button>`:'';
+  const q = (기준표 && 기준표[id]!==undefined) ? `<button class="icon-btn q" data-act="guide" data-id="${id}" aria-label="${label} 기준 보기">?</button>`:'';
   const cy = isCarryable(id) ? `<button class="icon-btn ${carried?'on':''}" data-act="carry" data-id="${id}" aria-pressed="${carried}" aria-label="${label} 내일로 넘기기">↪</button>`:'';
   return `<div class="row ${on?'on-check':''} ${carried?'carried':''}" style="padding-right:10px">
     <button data-act="ck" data-id="${id}" style="all:unset;display:flex;gap:12px;align-items:center;flex:1;cursor:pointer;min-height:40px"><span class="check">✓</span><span class="main">${esc(label)}${carried?'<span class="sub">내일 오픈으로 넘김</span>':''}</span></button>
-    ${cy}${cart}</div>`;
+    ${q}${cy}${cart}</div>`;
 }
 function closeStat(){
   const req=[...FILL_FLAT.map(x=>x.id),...CLEAN.flatMap(c=>c.items.map(i=>i[0])),...FINAL.map(f=>f[0]),...WEEKLY.filter(w=>w[2]===WD).map(w=>w[0])];
@@ -752,6 +799,20 @@ async function readCart(force){
   Object.keys(S.food.cart).forEach(k=>{ if(k.startsWith('주류:')) cart[k]=S.food.cart[k]; });
   S.food.cart=cart; S.food.srcs=srcs; S.food.sentSups=r.sent||{}; save();
   if(cur==='t-food'||cur==='t-close') rerender();
+}
+/* 🥩 오늘 고기 발주·입고가 나갔나 — **서버(시트)가 진실** (26-10-01)
+   사장님: 「고기발주입고 공유가 안되서 아직안한것으로 나옴」
+   → 「보냈다」를 이 폰에만 적고 있었습니다. 다른 폰은 계속 「남음」이었습니다.
+   ⚠️ 내가 방금 보낸 직후 20초는 서버 답을 기다립니다 (시트에 아직 안 찍혔을 수 있음)
+   ⚠️ 마감 체크와는 다릅니다. 마감 체크는 일부러 폰마다 따로입니다 */
+let meatOp=0;
+async function readMeat(){
+  if(!LIVE) return;
+  const r=await API.jsonp(STORE.orderGas,{action:'meatToday'},9000); if(!r||!r.ok) return;
+  if(Date.now()-meatOp<20000) return;
+  const o=r.order||null, st=r.stock||null;
+  if(o===S.meat.sent.order && st===S.meat.sent.recv) return;
+  S.meat.sent.order=o; S.meat.sent.recv=st; save(); rerender();
 }
 function 주류Msgs(){
   const sup=supOf('주류'), parts=[]; let sum=0;
@@ -868,7 +929,7 @@ document.addEventListener('click', async e=>{
   if(e.target.id==='ov'){ closeSheet(); return; }
   const b=e.target.closest('button'); if(!b) return;
   const a=b.dataset.act;
-  if(b.dataset.tab){ go(b.dataset.tab,b.dataset.mode); return; }
+  if(b.dataset.tab){ go(b.dataset.tab,b.dataset.mode); if(b.dataset.tab==='t-meat'||b.dataset.tab==='t-today') readMeat(); return; }
   switch(a){
     /* 숫자판 */
     case 'pad': openPad(b.dataset.path,b.dataset.unit,b.dataset.title,b.dataset.dec==='1'); break;
@@ -890,11 +951,12 @@ document.addEventListener('click', async e=>{
     case 'chip': { const arr=get(b.dataset.path), v=b.dataset.v, i=arr.indexOf(v); i<0?arr.push(v):arr.splice(i,1); save(); rerender(); break; }
     case 'sendmeat': { const k=b.dataset.v, msg=meatMsg(k);
       if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
-      openSheet(`<h2>사장님께 갈 문자</h2><div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
+      const 정정 = k==='order' && S.meat.sent.order;
+      openSheet(`<h2>${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 발주가 있습니다</b><span>이걸 보내면 업체에 「⚠️ 정정 — 앞서 보낸 발주 대신 이것」으로 갑니다</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
     case 'sendmeatok': { const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
       await API.post(STORE.orderGas, k==='order'
         ? {type:'order',branch:STORE.meatBranch,gc_use:n(o.use),gc_done:n(o.done),gc_ing:n(o.ing),dc:n(o.dc),mc:o.mcMax?0:n(o.mc),mc_max:!!o.mcMax,extras:o.extras,date:realDateStr(),monday_delay:new Date().getDay()===1}
-        : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()}); S.meat.sent[k]=hhmm(); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄'); break; }
+        : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()}); S.meat.sent[k]=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄'); break; }
 
     /* 식자재 */
     case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
@@ -946,6 +1008,8 @@ document.addEventListener('click', async e=>{
     case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)) break;
       await API.direct(R.dir,amt,R.date,R.memo); toast(`기록함 · ${R.dir} ${won(amt)}`); R.dir='';R.amt='';R.memo=''; rerender(); break; }
 
+    case 'guide': { const id=b.dataset.id; openSheet(`<h2>${esc(LABEL[id]||id)}</h2>${기준그리기(기준표&&기준표[id])}<button class="big-btn sec" data-act="close">닫기</button>`); break; }
+
     case 'close': closeSheet(); break;
   }
 });
@@ -980,8 +1044,9 @@ if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
 go('t-today');
 API.yesterday().then(d=>{ Y=d; window.Y=d; rerender(); });
 if(LIVE){
-  readCart(true); loadMonthly();
+  readCart(true); loadMonthly(); load기준표(); readMeat();
   setInterval(()=>{ if(document.visibilityState==='visible') readCart(); },15000);
+  setInterval(()=>{ if(document.visibilityState==='visible' && (cur==='t-today'||cur==='t-meat')) readMeat(); },20000);
   setInterval(()=>{ if(document.visibilityState==='visible') loadMonthly(); },30000);
   // 영업일이 바뀌면(오전 8시) 새로 시작
   setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
