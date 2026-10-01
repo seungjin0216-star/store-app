@@ -226,7 +226,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-01-v5';
+const APP_VERSION = '2026-10-02-v6';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -248,6 +248,8 @@ const STORE = {
   // ⚠️ 서버가 이 번호로 문자를 보냅니다 (서버 설정 번호가 한때 전부 사장님 번호였던 사고 이후 같이 보냄)
   phones: {'미락':'01089421859','콩나물':'01062333466','원당':'01041216995','네이버':'01041216995','사장님':'01053226995','배달관련':'01041216995','주류':'01056079640','음료수':'01037982411'},
   receiptStore: '백석점',
+  // 🔔 폰 알림을 보내는 곳 — 사장앱 서버 (26-10-02)
+  pushApi: 'https://endearing-frangollo-dc109d.netlify.app/.netlify/functions/owner-api',
   receiptGas: 'https://script.google.com/macros/s/AKfycbxKmN_Uo5hIGPm8ITQhM80FxinEL6q1dFiHZAaGR-eRsBb9EDno4C8et31a4mvwzkU9/exec',
 };
 const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락',''],['관리비','🏢','매장관리비',''],['가스','🔥','가스사용료','']];
@@ -526,7 +528,7 @@ function rToday(){
   ].filter(Boolean);
   const task = (dot,label,sub,tag,cls,goto,mode='')=>`<button class="row" data-tab="${goto}" data-mode="${mode}"><span class="dot ${dot}"></span><span class="main">${label}<span class="sub">${sub}</span></span><span class="tag ${cls}">${tag}</span></button>`;
   const mt = S.meat.sent;
-  el.innerHTML = `
+  el.innerHTML = notifyBanner() + `
     ${todayRows.length?`<div class="today">
       <div class="today-h">오늘은</div>
       ${todayRows.map(([em,t,sub])=>`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
@@ -558,6 +560,32 @@ function rToday(){
     ${Y.notices==null?'':`<h2>사장님 전달사항</h2>`}
     ${Y.notices==null?'':Y.notices.length?`<div class="list">${Y.notices.map(n=>`<div class="row"><span class="main">${esc(n.text)}<span class="sub">${esc(n.when)}</span></span></div>`).join('')}</div>`:'<p class="hint">전달사항 없음</p>'}
   `;
+}
+
+/* ══════════════ 🔔 폰 알림 (26-10-02) ══════════════
+   사장님: 「고기입고알림 (16시) , 식자재발주 (22시) , 어제보낸 발주,챙겨올것 (13시30분) , 마감체크 완료」
+   ⚠️ 아이폰은 홈 화면에 추가한 앱에서만 알림이 됩니다 (애플 규칙)
+   ⚠️ 이미 한 일은 알림이 안 옵니다 (입고를 넣었으면 16시 알림 없음) — 서버가 확인 */
+const pushOn = () => { try{ return localStorage.getItem('store-push-on')==='1'; }catch(e){ return false; } };
+function notifyBanner(){
+  if(!LIVE || pushOn()) return '';
+  const ios=/iPhone|iPad/.test(navigator.userAgent), standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))
+    return ios&&!standalone?`<div class="banner warn"><span class="em">🔔</span><div><b>알림을 받으려면</b><span>공유 → 홈 화면에 추가 한 뒤, 홈 화면의 「백석 매장」으로 열어 주세요</span></div></div>`:'';
+  return `<div class="banner warn"><span class="em">🔔</span><div style="flex:1"><b>폰 알림 받기</b><span>13:30 챙겨 올 것 · 16시 고기 입고 · 22시 식자재 · 마감 완료</span></div><button class="icon-btn on" data-act="pushon" style="align-self:center">켜기</button></div>`;
+}
+function b64u(s){ const p='='.repeat((4-s.length%4)%4); const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b,c=>c.charCodeAt(0)); }
+async function turnPushOn(){
+  try{
+    const perm=await Notification.requestPermission(); if(perm!=='granted'){ toast('알림이 허용되지 않았습니다'); return; }
+    const k=await (await fetch(STORE.pushApi+'?a=vapid')).json(); if(!k.key){ toast('알림 서버가 아직 준비 안 됐습니다'); return; }
+    const reg=await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(k.key)});
+    const r=await fetch(STORE.pushApi+'?a=staffsub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:STORE.code,sub:sub.toJSON(),device:DEVICE})});
+    if(!r.ok) throw new Error('등록 실패');
+    try{ localStorage.setItem('store-push-on','1'); }catch(e){}
+    toast('알림을 켰습니다'); rerender();
+  }catch(e){ toast('알림을 못 켰습니다 · '+e.message); }
 }
 
 /* ══════════════ 고기 ══════════════ */
@@ -767,6 +795,9 @@ async function finishClose(cash){
   if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
   S.close.done=hhmm(); S.close.cash=cash==null?null:cash; save(); closeSheet(); rerender();
   toast(carried.length?`마감 완료. 내일 오픈으로 ${carried.length}개 넘김`:'마감 완료');
+  // 🔔 사장님 (26-10-02): 「마감체크가 완료되었을때 알림이 울리게끔」 → 사장앱 + 다른 직원 폰 (누른 폰은 빼고)
+  //    ⚠️ 답장을 안 기다립니다 (no-cors). 알림이 안 가도 마감은 이미 끝났습니다
+  if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length})}).catch(()=>{});
 }
 
 /* ══════════════ 서버 동기화 ══════════════ */
@@ -1013,6 +1044,7 @@ document.addEventListener('click', async e=>{
 
     case 'guide': { const id=b.dataset.id; openSheet(`<h2>${esc(LABEL[id]||id)}</h2>${기준그리기(기준표&&기준표[id])}<button class="big-btn sec" data-act="close">닫기</button>`); break; }
 
+    case 'pushon': turnPushOn(); break;
     case 'close': closeSheet(); break;
   }
 });
