@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F6F5">
+<title>장수 매장앱 · 백석</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="백석 매장">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F4F6F5; --surface:#FFFFFF; --ink:#1C2529; --muted:#5E6B70; --line:#DCE2E0;
+  --char:#24323A; --beef:#B3261E; --done:#2E7D4F; --accent:#1F6F8B; --warm:#A8741A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12191C; --surface:#1B2428; --ink:#E8EEEC; --muted:#9AA8AC; --line:#2C383D;
+    --char:#0C1215; --beef:#E5675E; --done:#5BB585; --accent:#5BB2D1; --warm:#D9A44A;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12191C; --surface:#1B2428; --ink:#E8EEEC; --muted:#9AA8AC; --line:#2C383D;
+  --char:#0C1215; --beef:#E5675E; --done:#5BB585; --accent:#5BB2D1; --warm:#D9A44A;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;word-break:keep-all}
+button{font:inherit;color:inherit;cursor:pointer}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:480px;margin:0 auto}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.top-in{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px}
+.app-name{font-weight:700;font-size:19px}
+.app-name small{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+.demo{font-size:12px;color:var(--warm);border:1px solid var(--warm);border-radius:6px;padding:2px 7px;white-space:nowrap}
+
+main{padding:14px 20px 110px}
+.screen{display:none}.screen.on{display:block}
+h2{font-size:17px;margin:24px 0 8px}
+h2:first-child{margin-top:4px}
+h3{font-size:14px;color:var(--muted);font-weight:500;margin:16px 0 6px}
+.hint{color:var(--muted);font-size:14px;margin:0 0 10px}
+
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line);width:100%;text-align:left;background:transparent;border-left:0;border-right:0;border-bottom:0;min-height:52px}
+.row:first-child{border-top:0}
+.row .main{flex:1;min-width:0}
+.row .sub{display:block;font-size:13px;color:var(--muted)}
+.tag{font-size:12px;padding:3px 8px;border-radius:6px;white-space:nowrap;font-weight:500}
+.tag.warn{background:color-mix(in srgb,var(--beef) 14%,transparent);color:var(--beef)}
+.tag.ok{background:color-mix(in srgb,var(--done) 14%,transparent);color:var(--done)}
+.tag.wait{background:color-mix(in srgb,var(--muted) 14%,transparent);color:var(--muted)}
+.tag.info{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot.ok{background:var(--done)}.dot.bad{background:var(--beef)}.dot.idle{background:var(--line)}
+
+.check{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:15px;color:transparent}
+.on-check .check{background:var(--done);border-color:var(--done);color:#fff}
+.on-check .main{color:var(--muted);text-decoration:line-through}
+.carried .main{color:var(--muted)}
+.carried .check{border-style:dashed}
+
+.icon-btn{border:1px solid var(--line);background:var(--paper);border-radius:10px;height:36px;min-width:40px;padding:0 8px;font-size:15px;flex:none}
+.icon-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.banner{border-radius:14px;padding:14px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start}
+.banner b{display:block}
+.banner span{font-size:14px}
+.banner.green{background:color-mix(in srgb,var(--done) 14%,var(--surface));}
+.banner.warn{background:color-mix(in srgb,var(--warm) 14%,var(--surface));}
+.banner.red{background:color-mix(in srgb,var(--beef) 12%,var(--surface));}
+.banner .em{font-size:24px;line-height:1.2}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);margin-bottom:14px}
+.seg button{flex:1;border:0;background:transparent;padding:11px 0;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.supbar{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin:0 -20px 12px;padding-left:20px;padding-right:20px;scrollbar-width:none}
+.supbar::-webkit-scrollbar{display:none}
+.supbar button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 12px;font-size:15px;position:relative}
+.supbar button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+.supbar .cnt{margin-left:6px;font-size:12px;background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px}
+/* 이미 발주가 나간 업체 — 눈에 바로 들어와야 합니다 (사장님 요청 26-10-01) */
+.supbar button.sent{background:color-mix(in srgb,var(--done) 16%,var(--surface));border-color:var(--done)}
+.supbar .sentmark{margin-left:6px;font-size:12px;background:var(--done);color:#fff;border-radius:99px;padding:1px 7px;font-weight:500}
+
+.val{min-width:76px;height:42px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-weight:700;font-size:18px;text-align:right;padding:0 10px}
+.val.empty{color:var(--muted);font-weight:400}
+.val small{font-size:13px;font-weight:400;color:var(--muted);margin-left:3px}
+.qty{display:flex;align-items:center;gap:8px}
+.qty button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--paper);font-size:18px}
+.qty output{min-width:26px;text-align:center;font-weight:700}
+
+.calc{background:var(--char);color:#fff;border-radius:14px;padding:14px 16px;margin-top:12px}
+.calc .big{font-size:26px;font-weight:700}
+.calc .sm{font-size:13px;opacity:.8}
+
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;background:var(--done);transition:width .2s}
+
+details.grp{border-top:1px solid var(--line)}
+details.grp:first-child{border-top:0}
+details.grp summary{list-style:none;display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;font-weight:500}
+details.grp summary::-webkit-details-marker{display:none}
+details.grp summary::after{content:"▾";color:var(--muted);transition:transform .15s}
+details.grp[open] summary::after{transform:rotate(180deg)}
+details.grp .row{padding-left:28px;background:color-mix(in srgb,var(--paper) 50%,var(--surface))}
+
+.big-btn{width:100%;border:0;border-radius:14px;background:var(--accent);color:#fff;padding:16px;font-weight:700;font-size:17px;margin-top:16px}
+.big-btn:disabled{opacity:.4;cursor:not-allowed}
+.big-btn.sec{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.link-btn{background:none;border:0;color:var(--muted);text-decoration:underline;padding:12px;width:100%}
+.ghost{background:transparent;border:1.5px dashed var(--line);color:var(--muted);border-radius:14px;padding:30px 16px;width:100%;text-align:center;display:block;cursor:pointer}
+.ghost b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+.sentbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;white-space:pre-wrap;font-size:14px}
+.thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:var(--line)}
+
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .wrap{display:flex}
+nav.tabs button{flex:1;border:0;background:transparent;padding:9px 0 11px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+nav.tabs .ic{font-size:20px;line-height:1}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
+nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--beef)}
+
+.today{background:var(--char);color:#fff;border-radius:18px;padding:14px 16px 6px;margin-bottom:6px}
+.today-h{font-size:13px;opacity:.75;margin-bottom:4px}
+.today-r{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid #ffffff1f}
+.today-r:first-of-type{border-top:0}
+.today-r .em{font-size:22px;line-height:1.25}
+.today-r b{display:block;font-size:17px}
+.today-r span{font-size:15px;opacity:.85}
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.doc{border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:16px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.doc .e{font-size:26px;line-height:1}
+.doc small{color:var(--muted);font-size:12px}
+.doc{cursor:pointer}
+.doc:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.doc.sel,.doc[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.field{width:100%;height:50px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:17px;padding:0 14px}
+.fields{display:grid;grid-template-columns:2fr 1.3fr;gap:8px;margin-top:12px}
+.qerr{display:block;font-size:13px;color:var(--beef)}
+/* 아래에서 올라오는 판 */
+.ov{position:fixed;inset:0;z-index:20;background:#0009;display:none;align-items:flex-end;justify-content:center}
+.ov.show{display:flex}
+.sheet{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));max-height:88%;overflow-y:auto}
+.sheet h2{margin-top:0}
+.pad-disp{font-size:40px;font-weight:700;text-align:right;padding:4px 6px 12px;border-bottom:2px solid var(--accent);margin-bottom:12px}
+.pad-disp small{font-size:18px;color:var(--muted);font-weight:400;margin-left:4px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{height:58px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-size:22px;font-weight:500}
+.cashrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.cashsum{font-size:28px;font-weight:700;text-align:center;margin:16px 0 4px;color:var(--beef)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two .big-btn{margin-top:0}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--char);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+
+button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap top-in">
+  <div class="app-name">장수 매장앱<small id="dateLabel">백석점</small></div>
+  <span class="demo" id="modePill" title="여기서는 아무것도 보내지 않습니다">미리보기</span>
+</div></header>
+
+<main class="wrap" id="main">
+  <section class="screen" id="t-today"></section>
+  <section class="screen" id="t-meat"></section>
+  <section class="screen" id="t-food"></section>
+  <section class="screen" id="t-close"></section>
+  <section class="screen" id="t-rcpt"></section>
+</main>
+
+<nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
+<div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   장수 매장앱 (직원용) — 백석
+   APP_VERSION 을 화면 맨 아래 날짜 옆에 찍습니다. 새 판이 갔는지 눈으로 봅니다.
+
+   ⚠️ 기존 앱 5개(마감체크·고기발주·식자재·영수증)는 건드리지 않습니다.
+      문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
+      서버는 같은 곳·같은 형식을 씁니다.
+   ══════════════════════════════════════════════════════════ */
+const APP_VERSION = '2026-10-01-v1';
+
+/* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
+const STORE = {
+  name: '백석', code: 'baekseok',
+  closedDay: 2,                 // 화요일 휴무
+  /* 🔴 대파김치 하는 날 (사장님 확정 26-10-01)
+     기준은 **식자재발주의 미락 대파 수량**입니다.
+     대파를 이 수 **이상** 시키면 납품일이 「대파김치 하는 날」이 됩니다.
+     ⚠️ 전에는 5 였습니다. 그런데 마감체크 「대파김치」 🛒 가 담는 양이 정확히 5단이라
+        `5 > 5` 가 거짓이어서 **영원히 안 떴습니다.** 그래서 4 로 내렸습니다.
+        → 숫자를 바꿀 때는 아래 발주표 gr2 의 수량도 같이 보십시오. */
+  daepaKimchiOver: 4,
+  noMeatOrderDays: [2],         // 고기 발주 없는 요일 (0=일 … 6=토)
+  shiftHour: 16,                // 이 시각 전: 오픈·입고 화면 / 이후: 마감·발주 화면
+  branch: 'baekseok',            // 마감·식자재 서버가 쓰는 이름
+  meatBranch: 'baeseok',         // ⚠️ 고기 서버는 예전부터 이 철자입니다. 바꾸지 마세요
+  closeGas: 'https://script.google.com/macros/s/AKfycbxeauYyGzxWMcPSrpHAidBAnYMuIZW3XqmGg1gTomZfuM7vdmfJl2y-VG1Hk72ohFhTZg/exec',
+  orderGas: 'https://script.google.com/macros/s/AKfycbw97e3tDmVYUG4_cDiKQrkNuRhWAJFiUrMQuATAzfy0WEAZwhAPdMryzY-Oa8TGJe2-cg/exec',
+  // ⚠️ 서버가 이 번호로 문자를 보냅니다 (서버 설정 번호가 한때 전부 사장님 번호였던 사고 이후 같이 보냄)
+  phones: {'미락':'01089421859','콩나물':'01062333466','원당':'01041216995','네이버':'01041216995','사장님':'01053226995','배달관련':'01041216995','주류':'01056079640','음료수':'01037982411'},
+  receiptStore: '백석점',
+  receiptGas: 'https://script.google.com/macros/s/AKfycbxKmN_Uo5hIGPm8ITQhM80FxinEL6q1dFiHZAaGR-eRsBb9EDno4C8et31a4mvwzkU9/exec',
+};
+const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락',''],['관리비','🏢','매장관리비',''],['가스','🔥','가스사용료','']];
+const DIRECT_TYPES = [['가게카드','💳','가게카드',''],['콩나물','🌾','콩나물',''],['광고비','📣','광고비',''],['기타세금','🧾','기타세금','지방세·등록세'],['기타잡비용','🧰','기타잡비용','수리·소모품']];
+
+/* ── 품목 데이터 (기존 앱과 똑같이 유지) ── */
+const MEAT_EXTRAS = ['벌집양','천엽','간','간(반)','내장'];
+const TARGET_BY_DAY = [3,3,3,3,4,4,4];   // 일~토 곱창 목표(보)
+const MIN_ORDER = 1, MAX_ORDER = 2;
+
+const SUPS = [
+  { key:'미락', emoji:'🏪', qtyOnly:['부추','김가루','날치알','우동사리','메밀면','대파'],
+    items:['부추','양파','김가루','배추','라면','다진김치','포기김치','날치알','고추가루','우동사리','후리가께','메밀면','대파','고추','마늘','설탕','간장','식초','굵은소금','꽃소금'] },
+  { key:'콩나물', emoji:'🌱', qty:true, items:['콩나물'] },
+  { key:'원당', emoji:'🧂', items:['깍두기','불쇼술'] },
+  { key:'네이버', emoji:'🛒', groups:[
+    { label:'냉장·냉동', items:['떡','식빵','과일','미나리','오미자','레몬','생강','된장','오이'] },
+    { label:'찬냉장고 위 선반', items:['다시다','베트남고추','미원','후추','라면사리'] },
+    { label:'찬냉장고', items:['새우젓','쌈장','단무지'] },
+    { label:'식세기 옆 선반', items:['들기름','매실액','식용유','쌀','국간장','멸치액젓'] },
+    { label:'화구 옆 선반', items:['까나리'] },
+    { label:'창고 서랍', items:['토닉워터','롤휴지','연육비닐','지퍼백','물티슈','냅킨','두루마리'] },
+    { label:'그 외', items:['세제','청포도','헛개수','키친타올'] },
+  ]},
+  { key:'사장님', emoji:'👤', items:['국수소스','파장소스','식세기세제','감미','다대기','파랑봉지','흰봉지','부추봉지'] },
+  { key:'배달관련', emoji:'🛵', items:['배달봉투','사각용기 소','사각용기 중','반찬용기','기름장용기','전골용기','수저'] },
+  { key:'주류', emoji:'🍶', stock:true,
+    목표:{'참이슬후래쉬':3,'카스':3,'처음처럼':2,'새로':1,'진로':1,'참이슬빨뚜':1,'테라':1,'켈리':1,'청하':1},
+    체크만:['일품진로','복분자','매화수'],
+    items:['참이슬후래쉬','처음처럼','새로','진로','참이슬빨뚜','카스','테라','켈리','일품진로','복분자','청하','매화수'] },
+  { key:'음료수', emoji:'🥤', qty:true, items:['콜라','사이다','제로콜라','파인애플','웰치스포도'] },
+];
+SUPS.forEach(s=>{ if(s.groups) s.items = s.groups.flatMap(g=>g.items); });
+
+/* 마감 항목 → 식자재 바구니 (이름이 다른 것 주의)
+   ⚠️ gr2 대파김치는 대파 5단을 담습니다. STORE.daepaKimchiOver 와 짝입니다 */
+const 발주표 = {
+  gs1:[['사장님','국수소스',1]], gs2:[['사장님','파장소스',1]], gs3:[['네이버','들기름',1]],
+  f_ramen:[['미락','라면',1]], f_fruit:[['네이버','과일',1]],
+  gl1:[['미락','대파',1]], gl2:[['미락','고추',1]], gl3:[['미락','대파',1]], gl4:[['미락','배추',1]],
+  gl5:[['미락','대파',1]], gl6:[['네이버','단무지',1]], gl7:[['사장님','다대기',1]], gl8:[['미락','마늘',1]],
+  gl9:[['미락','포기김치',1]], gl10:[['네이버','미나리',1]],
+  gr2:[['미락','대파',5]], gr3:[['미락','다진김치',1]], gr4:[['원당','깍두기',1]],
+  g6_2:[['미락','고추',1]], g6_3:[['콩나물','콩나물',1]], g6_4:[['네이버','레몬',1]], g6_5:[['네이버','오이',1]],
+  gm2:[['미락','양파',1]], gm3:[['네이버','떡',1]],
+  f_fireshow:[['원당','불쇼술',1]], f_grape:[['네이버','청포도',1]], f_gammi:[['사장님','감미',1]], f_tissue:[['네이버','냅킨',1]],
+  f_powder:[['미락','고추가루',1],['네이버','다시다',1]],
+};
+
+const FILL = [
+  {g:'g_sauce',label:'소스류',items:[['gs1','국수소스'],['gs2','파장소스'],['gs3','들기름']]},
+  ['f_saltjang','소금장 채우기'],['f_ramen','라면 채우기'],['f_fruit','과일 꺼내놓기'],
+  {g:'g_left',label:'찬냉장고 하단 [좌측]',items:[['gl1','라면용대파'],['gl2','다진고추'],['gl3','다진대파'],['gl4','전골용배추'],['gl5','전골용대파'],['gl6','단무지'],['gl7','다대기'],['gl8','다진마늘'],['gl9','묵은지'],['gl10','미나리']]},
+  {g:'g_right',label:'찬냉장고 하단 [우측]',items:[['gr1','천엽'],['gr2','대파김치'],['gr3','볶음밥김치'],['gr4','깍두기'],['gr5','양파소스']]},
+  {g:'g_six',label:'6구냉장고',items:[['g6_1','전골용 내장'],['g6_2','전골용 고추'],['g6_3','콩나물'],['g6_4','레몬'],['g6_5','오이']]},
+  {g:'g_meat',label:'고기냉장고',items:[['gm1','고기정리'],['gm2','양파'],['gm3','떡']]},
+  ['f_banchan','찬냉장고 반찬리필'],['f_pajang','파장 만들기'],['f_powder','고춧가루·다시다 채우고 뚜껑 닫기'],
+  ['f_fireshow','불쇼술 채우기'],['f_drink','술, 음료 채우기'],['f_grape','청포도, 이쑤시개 채우기'],
+  ['f_broth','육수 확인'],['f_gammi','감미 채우기'],['f_tissue','테이블티슈 채우기'],
+];
+const CARRY_GROUPS = ['g_left','g_right','g_six','g_meat'];
+const OPEN_ITEMS = [['o1','밥하기'],['o2','육수 확인'],['o3','고기 확인'],['o4','홀테이블·데크바닥 정리'],['o5','예약 확인'],['o6','테이블 닦기']];
+const CLEAN = [
+  {label:'홀',items:[['c0','테이블 다시 닦기'],['c2','술박스 정리하기'],['c3','화구 라인 청소'],['c6','결제 영수증 버리기 (4개 남기기)'],['c5','분리수거하기']]},
+  {label:'주방',items:[['c7','주방 화구 · 선반 닦기'],['c8','바닥 청소'],['c9','냉장고 문 닦기'],['c1','쓴 행주 전부 삶기 (테이블행주 포함)'],['c4','식기세척기 끄고 청소'],['c10','쓰레기통 비우기']]},
+];
+const WEEKLY = [['w1','덕트 청소',1]];
+const MONTHLY = [['m1','냉장고 성에제거 및 청소'],['m2','주방바닥 퐁퐁청소'],['m3','유리 청소']];
+const FINAL = [['x1','고기·식자재 발주 무조건 하기'],['x2','저녁 먹을 거 확인 후 주문'],['x3','에어컨 끄기 (홀3, 주방1)'],['x4','가스 끄기']];
+
+const FILL_FLAT = FILL.flatMap(e=>Array.isArray(e)?[{id:e[0],label:e[1]}]:e.items.map(([id,label])=>({id,label,g:e.g})));
+const LABEL = {}; [...FILL_FLAT,...CLEAN.flatMap(c=>c.items.map(([id,label])=>({id,label}))),...FINAL.map(([id,label])=>({id,label})),...OPEN_ITEMS.map(([id,label])=>({id,label}))].forEach(x=>LABEL[x.id]=x.label);
+
+/* ── 영업일: 오전 8시 전까지는 전날 영업으로 봅니다 ── */
+const DAY = ['일','월','화','수','목','금','토'];
+const BD = (()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1); return d; })();
+const WD = BD.getDay();
+const BD_KEY = `${BD.getFullYear()}-${String(BD.getMonth()+1).padStart(2,'0')}-${String(BD.getDate()).padStart(2,'0')}`;
+const MONTH_KEY = BD_KEY.slice(0,7);
+
+/* ══════════════════════════════════════════════════════════
+   API — 서버와 이야기하는 곳은 여기 하나뿐입니다
+   DEMO=true 이면 예시 데이터를 쓰고 아무것도 보내지 않습니다.
+   연결할 때 이 안만 바꾸면 화면 코드는 그대로입니다.
+   ══════════════════════════════════════════════════════════ */
+const LIVE = /github\.io$/.test(location.hostname);   // 깃허브 주소에서 열렸을 때만 실제로 보냅니다
+const DEVICE = (()=>{ try{ let id=localStorage.getItem('phoneId'); if(!id){ id=Math.random().toString(36).slice(2,6); localStorage.setItem('phoneId',id);} return id; }catch(e){ return 'temp'; } })();
+const UA = (()=>{ const u=navigator.userAgent||''; return /iPhone/i.test(u)?'iPhone':/iPad/i.test(u)?'iPad':/SM-|Galaxy/i.test(u)?'Galaxy':/Android/i.test(u)?'Android':/Macintosh/i.test(u)?'Mac':/Windows/i.test(u)?'Windows':'기타'; })();
+
+const DEMO_Y = {
+  carry:[{id:'gl8',label:'다진마늘'},{id:'gm3',label:'떡'}],
+  bossOrder:['국수소스','다대기','파랑봉지'], wondangOrder:['깍두기','불쇼술'],
+  meatIn:['곱창 1','막창 1','천엽'], cashShort:12000, daepa:6,
+  notices:[{text:'금요일 18시 단체 12명 예약. 6·7번 테이블 붙여두기',when:'어제 23:10'}],
+};
+
+const API = {
+  LIVE, DEMO: !LIVE, RECEIPT_LIVE: LIVE,
+  /* 보내기 — 답장을 안 기다립니다 (no-cors). 화면은 이미 바뀐 뒤입니다 */
+  post(url, body){
+    if(!LIVE){ console.log('[미리보기] 안 보냄', body); return Promise.resolve(); }
+    return fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(()=>{});
+  },
+  /* 읽기 — JSONP. 답: 객체 / undefined(못 물어봄) */
+  jsonp(url, params, ms=12000){
+    if(!LIVE) return Promise.resolve(undefined);
+    return new Promise(done=>{
+      const cb='_cb'+Date.now()+Math.floor(Math.random()*1e6), sc=document.createElement('script'); let end=false;
+      const clean=()=>{ if(end)return; end=true; try{delete window[cb];}catch(e){} sc.remove(); };
+      window[cb]=r=>{ clean(); done(r); };
+      sc.onerror=()=>{ clean(); done(undefined); }; setTimeout(()=>{ if(!end){ clean(); done(undefined); } },ms);
+      sc.src=url+'?'+Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')+'&callback='+cb;
+      document.body.appendChild(sc);
+    });
+  },
+
+  /* 오늘 화면 — 어제 데이터
+     · 넘어온 것: 마감 서버 (이미 있음)
+     · 고기·발주·시재·대파·전달사항: 발주 서버 action=brief (서버에 추가하면 자동으로 뜸, 없으면 칸을 숨김) */
+  async yesterday(){
+    if(!LIVE) return DEMO_Y;
+    const [c,b0] = await Promise.all([
+      this.jsonp(STORE.closeGas,{action:'carryover',date:BD_KEY}),
+      this.jsonp(STORE.orderGas,{action:'brief',date:BD_KEY,branch:STORE.branch},8000),
+    ]);
+    const b=(b0&&b0.ok)?b0:{};
+    return {
+      carry: ((c&&c.items)||[]).map(it=>typeof it==='string'?{id:it,label:it}:{id:it.id||it.label,label:it.label||it.id}),
+      bossOrder:b.bossOrder||null, wondangOrder:b.wondangOrder||null, meatIn:b.meatIn||null,
+      cashShort:(b.cashShort==null?null:b.cashShort), daepa:(b.daepa==null?null:b.daepa), notices:b.notices||null,
+    };
+  },
+
+  /* 영수증 — 기존 영수증 분석기와 같은 서버·같은 형식 */
+  photoExists(hash){
+    if(!hash) return Promise.resolve(undefined);
+    if(!LIVE) return Promise.resolve(demoHashes.has(hash)?{시각:'방금'}:null);
+    return this.jsonp(STORE.receiptGas,{action:'사진있나',store:STORE.receiptStore,h:hash},9000)
+      .then(r=>(r&&r.ok)?(r.있음?(r.정보||{}):null):undefined);
+  },
+  async uploadPhoto(q){
+    if(!LIVE){ await wait(300); if(q.hash) demoHashes.add(q.hash); return; }
+    await this.post(STORE.receiptGas,{base64:q.b64,mime:'image/jpeg',docType:q.docType,store:STORE.receiptStore,fname:q.fname,hash:q.hash});
+  },
+  direct(분류,금액,날짜,항목명){ return this.post(STORE.receiptGas,{action:'direct',store:STORE.receiptStore,분류,금액,날짜,항목명}); },
+};
+
+/* ── 상태 (이 폰에만 저장, 날이 바뀌면 새로 시작) ──
+   ⚠️ 마감 체크는 **일부러 폰마다 따로**입니다. 서버에 올리기만 하고 받아오지 않습니다.
+      사장님 결정 (26-09-22): 「처음처럼 각자 체크하고 완료하는게 좋을듯」
+      → 두 사람이 더블체크하는 구조입니다. 공유하면 더블체크가 무의미해집니다.
+   ⚠️ 반대로 **식자재 바구니는 서버가 진실**입니다 (두 폰이 같은 바구니를 봅니다). */
+const SAVE_KEY = 'jangsoo-store-'+STORE.code;
+function fresh(){ return {
+  day:BD_KEY,
+  meat:{mode:'order', order:{use:null,done:null,ing:null,dc:null,mc:null,mcMax:false,extras:[]}, recv:{gc:null,dc:null,mc:null,box:null,extras:[]}, sent:{order:null,recv:null}},
+  food:{sup:'미락', cart:{}, stock:{}, srcs:{}, sentSups:{}, fromClose:0, sent:null},
+  close:{mode: new Date().getHours()<15 && new Date().getHours()>=8 ? 'open':'close', checks:{}, carry:{}, openChecks:{}, openDone:false, done:false, cash:null},
+  monthly:{month:MONTH_KEY, checks:{}},
+  receipts:[],
+};}
+let S;
+try{ S = JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){ S=null; }
+if(S && S.food && !S.food.srcs){ S.food.srcs={}; S.food.sentSups={}; }
+if(!S || S.day!==BD_KEY){ const m = S && S.monthly && S.monthly.month===MONTH_KEY ? S.monthly : null; const r = S? (S.receipts||[]).slice(0,20):[]; S=fresh(); if(m) S.monthly=m; S.receipts=r; }
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+
+let Y = null; // 어제 데이터
+
+/* ── 영업 시각: 새벽 0시 35분 = 전날 24.58시 (발주 지연 판단에 씁니다) ── */
+function bizHour(){ const d=new Date(); const h=d.getHours()+d.getMinutes()/60; return h<8?h+24:h; }
+function isDelayed(){ const h=bizHour(); if(WD===2&&h>=20.5) return false; if(WD===2) return true; if(WD===1&&h>=14) return true; return false; }
+function nextDayKey(){ const d=new Date(BD_KEY+'T12:00:00'); d.setDate(d.getDate()+1); while(d.getDay()===STORE.closedDay) d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
+function realDateStr(){ const d=new Date(); return String(d.getFullYear()).slice(2)+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+'('+DAY[d.getDay()]+')'; }
+
+/* ── 작은 도구 ── */
+const $ = s=>document.querySelector(s);
+const won = n=>n.toLocaleString('ko-KR')+'원';
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function get(path){ return path.split('.').reduce((o,k)=>o&&o[k],S); }
+function set(path,v){ const ks=path.split('.'); const last=ks.pop(); ks.reduce((o,k)=>o[k],S)[last]=v; save(); }
+let tt; function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),1800); }
+function hhmm(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+/* ── 탭 ── */
+const TABS = [['t-today','✓','오늘'],['t-meat','🥩','고기'],['t-food','🥬','식자재발주'],['t-close','🌙','마감체크'],['t-rcpt','🧾','영수증']];
+const RENDER = {'t-today':rToday,'t-meat':rMeat,'t-food':rFood,'t-close':rClose,'t-rcpt':rRcpt};
+let cur = 't-today';
+function autoMode(id){
+  const h=new Date().getHours(), early = h>=8 && h<STORE.shiftHour;
+  if(id==='t-meat') S.meat.mode = early?'recv':'order';
+  if(id==='t-close') S.close.mode = early?'open':'close';
+}
+function go(id,mode){
+  if(mode){ if(id==='t-meat') S.meat.mode=mode; if(id==='t-close') S.close.mode=mode; }
+  else if(id!==cur) autoMode(id);
+  save();
+  cur=id; RENDER[id]();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  rTabs(); window.scrollTo(0,0);
+}
+function rerender(){ RENDER[cur](); rTabs(); }
+function rTabs(){
+  const badge = {'t-meat':!S.meat.sent.order,'t-food':!S.food.sent,'t-close':!S.close.done};
+  $('#tabs').innerHTML = TABS.map(([id,ic,l])=>`<button data-tab="${id}" aria-current="${id===cur?'page':'false'}"><span class="ic" aria-hidden="true">${ic}</span>${l}${badge[id]&&id!==cur?'<i class="badge" aria-label="할 일 남음"></i>':''}</button>`).join('');
+}
+
+/* ══════════════ 오늘 ══════════════ */
+function cartQty(sup,item){ const c=S.food.cart[sup+':'+item]; return c&&c.on?(c.qty||1):0; }
+function rToday(){
+  const el=$('#t-today');
+  // ⚠️ 화면은 서버를 기다리지 않습니다. 어제 데이터는 도착하는 대로 채웁니다
+  const Y = window.Y || {carry:[],bossOrder:null,wondangOrder:null,meatIn:null,cashShort:null,daepa:null,notices:null};
+  // 🔴 대파김치: 식자재발주의 미락 대파 수량이 기준입니다 (4단 이상)
+  const daepaDay = Y.daepa!=null && Y.daepa >= STORE.daepaKimchiOver;
+  const closedToday = WD===STORE.closedDay;
+  const noMeat = STORE.noMeatOrderDays.includes(WD);
+  const todayRows = [
+    Y.meatIn==null ? null : Y.meatIn.length ? ['🥩','오늘 들어오는 고기', Y.meatIn.join(', ')] : ['🥩','오늘 들어오는 고기 없음',''],
+    daepaDay ? ['🥬','대파김치 하는 날', `어제 대파 ${Y.daepa}단 주문`] : null,
+    noMeat ? ['🚫','고기 발주 없는 날', ''] : null,
+    closedToday ? ['💤','휴무일', '발주는 저장만 되고 저녁에 자동 발송'] : null,
+  ].filter(Boolean);
+  const task = (dot,label,sub,tag,cls,goto,mode='')=>`<button class="row" data-tab="${goto}" data-mode="${mode}"><span class="dot ${dot}"></span><span class="main">${label}<span class="sub">${sub}</span></span><span class="tag ${cls}">${tag}</span></button>`;
+  const mt = S.meat.sent;
+  el.innerHTML = `
+    ${todayRows.length?`<div class="today">
+      <div class="today-h">오늘은</div>
+      ${todayRows.map(([em,t,sub])=>`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
+    </div>`:''}
+    <h2>오늘 할 일</h2>
+    <p class="hint">위에서부터 하면 됩니다.</p>
+    <div class="list">
+      ${task(S.close.openDone?'ok':'idle','오픈 체크', S.close.openDone?'완료':'출근하면 먼저', S.close.openDone?'완료':'대기', S.close.openDone?'ok':'wait','t-close','open')}
+      ${task(mt.recv?'ok':'idle','고기 입고 입력', mt.recv?mt.recv+' 보냄':'15:00까지', mt.recv?'완료':'대기', mt.recv?'ok':'wait','t-meat','recv')}
+      ${task(S.food.sent?'ok':'bad','식자재 발주', S.food.sent?S.food.sent+' 보냄':'미락 22:25 마감', S.food.sent?'완료':'남음', S.food.sent?'ok':'warn','t-food')}
+      ${noMeat?'':task(mt.order?'ok':'bad','고기 발주', mt.order?mt.order+' 보냄':'22:00까지', mt.order?'완료':'남음', mt.order?'ok':'warn','t-meat','order')}
+      ${task(S.close.done?'ok':'idle','마감 체크', S.close.done?'완료':'영업 끝나고', S.close.done?'완료':'저녁', S.close.done?'ok':'wait','t-close','close')}
+    </div>
+
+    <h2>어제 마감에서 넘어온 것</h2>
+    ${Y.carry.length?`<div class="list">${Y.carry.map(c=>{ const on=S.close.openChecks['cy_'+c.id]; return `<button class="row ${on?'on-check':''}" data-act="openck" data-id="cy_${c.id}"><span class="check">✓</span><span class="main">${esc(c.label)}<span class="sub">오픈 때 해 주세요</span></span></button>`;}).join('')}</div>`:'<p class="hint">넘어온 것 없음</p>'}
+
+    ${(Y.bossOrder==null&&Y.wondangOrder==null)?'':`<h2>어제 보낸 발주 · 챙겨 올 것</h2>`}
+    ${(Y.bossOrder==null&&Y.wondangOrder==null)?'':((Y.bossOrder||[]).length||(Y.wondangOrder||[]).length)?`<div class="list">
+      ${(Y.bossOrder||[]).length?`<div class="row"><span class="main"><b>👤 사장님</b><span class="sub" style="color:var(--ink)">${Y.bossOrder.map(esc).join(', ')}</span></span><span class="tag info">${Y.bossOrder.length}개</span></div>`:''}
+      ${(Y.wondangOrder||[]).length?`<div class="row"><span class="main"><b>🧂 원당</b><span class="sub" style="color:var(--ink)">${Y.wondangOrder.map(esc).join(', ')}</span></span><span class="tag info">${Y.wondangOrder.length}개</span></div>`:''}
+    </div>`:'<p class="hint">없음</p>'}
+
+    ${Y.cashShort==null?'':`<h2>어제 시재</h2>
+    <div class="list"><div class="row">${Y.cashShort>0
+      ?`<span class="dot bad"></span><span class="main num">${won(Y.cashShort)} 부족<span class="sub">사장님께 알림 감</span></span><span class="tag warn">부족</span>`
+      :`<span class="dot ok"></span><span class="main">맞음</span><span class="tag ok">정상</span>`}</div></div>`}
+
+    ${Y.notices==null?'':`<h2>사장님 전달사항</h2>`}
+    ${Y.notices==null?'':Y.notices.length?`<div class="list">${Y.notices.map(n=>`<div class="row"><span class="main">${esc(n.text)}<span class="sub">${esc(n.when)}</span></span></div>`).join('')}</div>`:'<p class="hint">전달사항 없음</p>'}
+  `;
+}
+
+/* ══════════════ 고기 ══════════════ */
+function valBtn(path,unit,title,dec=true){
+  const v=get(path); return `<button class="val num ${v==null?'empty':''}" data-act="pad" data-path="${path}" data-unit="${unit}" data-title="${esc(title)}" data-dec="${dec?1:0}">${v==null?'-':v}<small>${unit}</small></button>`;
+}
+function meatCalc(){
+  const o=S.meat.order, total=(+o.use||0)+(+o.done||0)+(+o.ing||0), target=TARGET_BY_DAY[WD];
+  const raw=Math.round(target-total), order=Math.min(Math.max(raw<=0?0:raw,MIN_ORDER),MAX_ORDER);
+  return {total,target,order};
+}
+function rMeat(){
+  const m=S.meat, el=$('#t-meat'), isMon=WD===1;
+  const seg=`<div class="seg" role="group" aria-label="입력 종류"><button data-act="meatmode" data-v="order" aria-pressed="${m.mode==='order'}">발주 입력 <small>22:00</small></button><button data-act="meatmode" data-v="recv" aria-pressed="${m.mode==='recv'}">입고 입력 <small>15:00</small></button></div>`;
+  const chips=(path)=>`<div class="chips">${MEAT_EXTRAS.map(x=>`<button class="chip" data-act="chip" data-path="${path}" data-v="${x}" aria-pressed="${get(path).includes(x)}">${x}</button>`).join('')}</div>`;
+  if(m.mode==='order'){
+    const c=meatCalc();
+    el.innerHTML = seg + (STORE.noMeatOrderDays.includes(WD)?`<div class="banner red"><span class="em">🚫</span><div><b>오늘은 고기 발주 없는 날</b><span>입력하지 않아도 됩니다</span></div></div>`:'') + (isMon?`<div class="banner warn"><span class="em">⚠️</span><div><b>월요일 발주 — 업체 화요일 휴무</b><span>저장해 두면 화요일 20:00에 자동 발송, 수요일 납품</span></div></div>`:'')
+    + (m.sent.order?`<div class="banner green"><span class="em">✅</span><div><b>${m.sent.order} 발주 보냄</b><span>고쳐서 다시 보내도 됩니다</span></div></div>`:'')
+    + `<h2>곱창 재고</h2><p class="hint">지금 남은 양을 보 단위로 적어 주세요.</p>
+      <div class="list">
+        <div class="row"><span class="main">쓰고 있는 것<span class="sub">현재 홀 사용 중</span></span>${valBtn('meat.order.use','보','쓰고 있는 곱창')}</div>
+        <div class="row"><span class="main">연육 완료<span class="sub">냉장 보관 완료분</span></span>${valBtn('meat.order.done','보','연육 완료')}</div>
+        <div class="row"><span class="main">연육 중<span class="sub">현재 진행분</span></span>${valBtn('meat.order.ing','보','연육 중')}</div>
+      </div>
+      <div class="calc num"><div class="sm">곱창 발주 (자동 계산)</div><div class="big">${c.order}보</div><div class="sm">${DAY[WD]}요일 목표 ${c.target}보 − 재고 ${c.total}보 · ${MIN_ORDER}~${MAX_ORDER}보 사이로 맞춤</div></div>
+      <h2>대창 · 막창</h2><p class="hint">발주할 수량을 직접 적어 주세요.</p>
+      <div class="list">
+        <div class="row"><span class="main">대창</span>${valBtn('meat.order.dc','보','대창 발주')}</div>
+        <div class="row"><span class="main">막창<span class="sub">${m.order.mcMax?'업체 가용물량 전량':''}</span></span>
+          <button class="icon-btn ${m.order.mcMax?'on':''}" data-act="mcmax" aria-pressed="${m.order.mcMax}">최대치</button>
+          ${m.order.mcMax?'':valBtn('meat.order.mc','보','막창 발주')}</div>
+      </div>
+      <h2>추가 주문</h2>${chips('meat.order.extras')}
+      <button class="big-btn" data-act="sendmeat" data-v="order">${m.sent.order?'다시 보내기':'발주 보내기'}</button>`;
+  } else {
+    el.innerHTML = seg
+    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>${m.sent.recv} 입고 보냄</b><span>고쳐서 다시 보내도 됩니다</span></div></div>`:'')
+    + `<h2>오늘 들어온 양</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
+      <div class="list">
+        <div class="row"><span class="main">곱창</span>${valBtn('meat.recv.gc','보','곱창 입고')}</div>
+        <div class="row"><span class="main">대창</span>${valBtn('meat.recv.dc','보','대창 입고')}</div>
+        <div class="row"><span class="main">막창</span>${valBtn('meat.recv.mc','보','막창 입고')}</div>
+        <div class="row"><span class="main">박스</span>${valBtn('meat.recv.box','개','박스',false)}</div>
+      </div>
+      <h2>기타 입고</h2>${chips('meat.recv.extras')}
+      <button class="big-btn" data-act="sendmeat" data-v="recv">${m.sent.recv?'다시 보내기':'입고 보내기'}</button>`;
+  }
+}
+function meatMsg(kind){
+  const d=`${BD.getMonth()+1}/${BD.getDate()}(${DAY[WD]})`;
+  if(kind==='order'){ const o=S.meat.order,c=meatCalc();
+    return `[백석 고기 발주] ${d}\n곱창 ${c.order}보 (재고 ${c.total} / 목표 ${c.target})\n대창 ${o.dc??0}보\n막창 ${o.mcMax?'최대치':(o.mc??0)+'보'}${o.extras.length?'\n추가: '+o.extras.join(', '):''}`; }
+  const r=S.meat.recv;
+  return `[백석 고기 입고] ${d}\n곱창 ${r.gc??0}보 · 대창 ${r.dc??0}보 · 막창 ${r.mc??0}보\n박스 ${r.box??0}개${r.extras.length?'\n기타: '+r.extras.join(', '):''}`;
+}
+
+/* ══════════════ 식자재 발주 ══════════════ */
+function supOf(k){ return SUPS.find(s=>s.key===k); }
+function kindOf(sup,item){
+  if(sup.stock && sup.목표[item]!==undefined) return 'stock';
+  if(sup.체크만 && sup.체크만.includes(item)) return 'toggle';
+  if(sup.qtyOnly) return sup.qtyOnly.includes(item)?'qty':'toggle';
+  return sup.qty?'qty':'toggle';
+}
+function stockOrder(item){ const v=S.food.stock[item]; if(v==null||v==='') return null; const n=Math.round(+v); return Math.max(0, supOf('주류').목표[item]-n); }
+function supCount(sup){
+  if(sup.stock){ return sup.items.filter(i=>kindOf(sup,i)==='stock'?(stockOrder(i)||0)>0:cartQty(sup.key,i)>0).length; }
+  return sup.items.filter(i=>cartQty(sup.key,i)>0).length;
+}
+/* 🔴 이미 발주가 나간 업체인가 (사장님 요청 26-10-01)
+   서버가 r.sent 로 알려줍니다. 두 폰이 같은 값을 봅니다.
+   값이 시각 문자열이면 그대로 보여주고, 아니면 「보냄」만 씁니다. */
+function sentOf(key){
+  const v = S.food.sentSups && S.food.sentSups[key];
+  if(!v) return null;
+  const s = String(v);
+  return /\d/.test(s) ? s.slice(0,5) : '보냄';
+}
+function rFood(){
+  const f=S.food, el=$('#t-food'), sup=supOf(f.sup);
+  const monTue = WD===1||WD===2;
+  const daepa = cartQty('미락','대파');
+  const total = SUPS.reduce((a,s)=>a+supCount(s),0);
+  const 나간업체 = SUPS.map(s=>s.key).filter(k=>sentOf(k));
+  const 이업체나감 = sentOf(sup.key);
+  const rowFor = item=>{
+    const k=kindOf(sup,item), key=sup.key+':'+item, c=f.cart[key];
+    if(k==='stock'){ const o=stockOrder(item);
+      return `<div class="row"><span class="main">${item}<span class="sub">목표 ${sup.목표[item]}박스${o!=null?` → <b>${o}박스 시킴</b>`:''}</span></span>${valBtn('food.stock.'+item,'남음','남은 '+item+' 박스')}</div>`; }
+    if(k==='qty'){ const q=c&&c.on?(c.qty||1):0;
+      return `<div class="row"><span class="main">${item}</span><span class="qty"><button data-act="fq" data-k="${key}" data-d="-1" aria-label="${item} 줄이기">−</button><output class="num">${q}</output><button data-act="fq" data-k="${key}" data-d="1" aria-label="${item} 늘리기">+</button></span></div>`; }
+    const on=c&&c.on;
+    return `<button class="row ${on?'on-check':''}" data-act="ft" data-k="${key}"><span class="check">✓</span><span class="main" style="text-decoration:none;color:inherit">${item}</span></button>`;
+  };
+  el.innerHTML = `
+    ${monTue?`<div class="banner warn"><span class="em">⚠️</span><div><b>월·화 발주 — 화요일 저녁 자동 발송</b><span>화요일 20:30에 업체로 나가고 수요일 납품. 월요일 14시 전 발주는 바로 나갑니다</span></div></div>`:''}
+    ${나간업체.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 이미 나간 발주</b><span>${나간업체.map(k=>`${supOf(k).emoji} ${k} ${sentOf(k)}`).join(' · ')}</span></div></div>`:''}
+    ${f.sent?`<div class="banner green"><span class="em">✅</span><div><b>${f.sent} 이 폰에서 보냄</b><span>더 담아서 또 보내도 됩니다</span></div></div>`:''}
+    ${daepa>=STORE.daepaKimchiOver?`<div class="banner green"><span class="em">🥬</span><div><b>대파 ${daepa}단</b><span>납품일이 「대파김치 하는 날」로 오늘 화면에 뜹니다</span></div></div>`:''}
+    ${f.fromClose?`<p class="hint">마감체크에서 담은 ${f.fromClose}개가 들어 있어요.</p>`:''}
+    <div class="supbar" role="group" aria-label="업체">${SUPS.map(s=>{const n=supCount(s),st=sentOf(s.key);return `<button class="${st?'sent':''}" data-act="sup" data-v="${s.key}" aria-pressed="${s.key===f.sup}">${s.emoji} ${s.key}${n?`<span class="cnt num">${n}</span>`:''}${st?`<span class="sentmark num">📨 ${st}</span>`:''}</button>`;}).join('')}</div>
+    ${이업체나감?`<div class="banner green"><span class="em">📨</span><div><b>${sup.key} 발주는 ${이업체나감}에 이미 나갔습니다</b><span>빠진 것이 있으면 담아서 또 보낼 수 있습니다. 같은 것을 또 담지는 마세요</span></div></div>`:''}
+    ${sup.stock?'<p class="hint">남은 박스만 세어 적으면 시킬 개수는 앱이 계산합니다. 합계 3개 미만이면 안 나갑니다.</p>':''}
+    ${sup.groups
+      ? sup.groups.map(g=>`<h3>${g.label}</h3><div class="list">${g.items.map(rowFor).join('')}</div>`).join('')
+      : `<div class="list">${sup.items.map(rowFor).join('')}</div>`}
+    <button class="big-btn" data-act="foodpreview" ${total?'':'disabled'}>미리보기 (${total}개)</button>`;
+}
+function foodLines(){
+  const out=[];
+  SUPS.forEach(sup=>{
+    let parts=[], note='';
+    if(sup.stock){
+      const st=sup.items.filter(i=>kindOf(sup,i)==='stock').map(i=>[i,stockOrder(i)]).filter(([,o])=>o>0);
+      const sum=st.reduce((a,[,o])=>a+o,0);
+      if(sum>0 && sum<3) note=`합계 ${sum}개 — 3개 미만이라 안 나갑니다`;
+      else st.forEach(([i,o])=>parts.push(`${i} ${o}`));
+      sup.items.filter(i=>kindOf(sup,i)==='toggle'&&cartQty(sup.key,i)).forEach(i=>parts.push(i));
+    } else {
+      sup.items.forEach(i=>{ const q=cartQty(sup.key,i); if(!q) return; parts.push(kindOf(sup,i)==='qty'?`${i} ${q}`:i); });
+    }
+    if(parts.length||note) out.push({sup:sup.key, emoji:sup.emoji, text:parts.join(', '), note, sent:sentOf(sup.key)});
+  });
+  return out;
+}
+
+/* ══════════════ 마감체크 ══════════════ */
+function isCarryable(id){ const it=FILL_FLAT.find(x=>x.id===id); return it&&CARRY_GROUPS.includes(it.g); }
+function itemRow(id,label,opts={}){
+  const c=S.close, on=!!c.checks[id], carried=!!c.carry[id];
+  const inCart=!!S.food.srcs[id];
+  const cart = 발주표[id] ? `<button class="icon-btn ${inCart?'on':''}" data-act="tocart" data-id="${id}" aria-pressed="${inCart}" aria-label="${label} 발주에 담기">🛒</button>`:'';
+  const cy = isCarryable(id) ? `<button class="icon-btn ${carried?'on':''}" data-act="carry" data-id="${id}" aria-pressed="${carried}" aria-label="${label} 내일로 넘기기">↪</button>`:'';
+  return `<div class="row ${on?'on-check':''} ${carried?'carried':''}" style="padding-right:10px">
+    <button data-act="ck" data-id="${id}" style="all:unset;display:flex;gap:12px;align-items:center;flex:1;cursor:pointer;min-height:40px"><span class="check">✓</span><span class="main">${esc(label)}${carried?'<span class="sub">내일 오픈으로 넘김</span>':''}</span></button>
+    ${cy}${cart}</div>`;
+}
+function closeStat(){
+  const req=[...FILL_FLAT.map(x=>x.id),...CLEAN.flatMap(c=>c.items.map(i=>i[0])),...FINAL.map(f=>f[0]),...WEEKLY.filter(w=>w[2]===WD).map(w=>w[0])];
+  const done=req.filter(id=>S.close.checks[id]||S.close.carry[id]).length;
+  return {done,total:req.length};
+}
+function rClose(){
+  const c=S.close, el=$('#t-close');
+  const seg=`<div class="seg" role="group" aria-label="오픈 또는 마감"><button data-act="closemode" data-v="open" aria-pressed="${c.mode==='open'}">🌅 오픈</button><button data-act="closemode" data-v="close" aria-pressed="${c.mode==='close'}">🌙 마감</button></div>`;
+  if(c.mode==='open'){
+    /* ⚠️ 어제 넘어온 것이 서버에서 도착하기 전에 「오픈 완료」를 누르면
+          넘어온 일을 안 하고 끝내 버립니다. 도착할 때까지 버튼을 막습니다. */
+    const 기다림 = LIVE && Y===null;
+    const carry=Y?Y.carry:[];
+    const all=[...carry.map(x=>'cy_'+x.id),...OPEN_ITEMS.map(o=>o[0])];
+    const ok=!기다림 && all.every(id=>c.openChecks[id]);
+    const r=(id,label,sub)=>`<button class="row ${c.openChecks[id]?'on-check':''}" data-act="openck" data-id="${id}"><span class="check">✓</span><span class="main">${esc(label)}${sub?`<span class="sub">${sub}</span>`:''}</span></button>`;
+    el.innerHTML = seg + (c.openDone?`<div class="banner green"><span class="em">✅</span><div><b>오픈 준비 완료</b><span>${c.openDone}</span></div></div>`:'')
+      + (기다림?`<div class="banner warn"><span class="em">⏳</span><div><b>어제 넘어온 것을 불러오는 중</b><span>잠깐만요. 다 나온 뒤에 완료할 수 있습니다</span></div></div>`:'')
+      + (carry.length?`<h2>어제 마감에서 넘어온 것</h2><div class="list">${carry.map(x=>r('cy_'+x.id,x.label,'어제 못 한 것')).join('')}</div>`:(기다림?'':''))
+      + `<h2>오픈 준비</h2><div class="list">${OPEN_ITEMS.map(([id,l])=>r(id,l)).join('')}</div>`
+      + (c.openDone?'':`<button class="big-btn" data-act="opendone" ${ok?'':'disabled'}>${기다림?'불러오는 중…':'오픈 완료'}</button>`);
+    return;
+  }
+  if(c.done){
+    el.innerHTML = seg + `<div class="banner green"><span class="em">✅</span><div><b>오늘 마감 완료</b><span>${c.done}${c.cash?` · 시재 ${c.cash>0?won(c.cash)+' 부족 알림':'맞음'}`:''}</span></div></div>`
+      + `<button class="big-btn sec" data-act="undo">완료 취소하기</button>`;
+    return;
+  }
+  const st=closeStat(), pct=Math.round(st.done/st.total*100);
+  const fillHtml = FILL.map(e=>{
+    if(Array.isArray(e)) return itemRow(e[0],e[1]);
+    const n=e.items.filter(([id])=>c.checks[id]||c.carry[id]).length;
+    return `<details class="grp" ${n<e.items.length?'open':''}><summary><span class="main" style="flex:1">${e.label}</span><span class="tag ${n===e.items.length?'ok':'wait'} num">${n}/${e.items.length}</span></summary>${e.items.map(([id,l])=>itemRow(id,l)).join('')}</details>`;
+  }).join('');
+  const weekly=WEEKLY.filter(w=>w[2]===WD);
+  el.innerHTML = seg + `
+    <div class="num" style="display:flex;justify-content:space-between;font-size:14px"><span>전체 진행</span><b>${st.done}/${st.total}</b></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <p class="hint">🛒 누르면 식자재 발주에 담기고(다시 누르면 빠짐), ↪ 누르면 내일 오픈으로 넘어갑니다.</p>
+    <h2>채우기</h2><div class="list">${fillHtml}</div>
+    ${CLEAN.map(g=>`<h2>청소 · ${g.label}</h2><div class="list">${g.items.map(([id,l])=>itemRow(id,l)).join('')}</div>`).join('')}
+    ${weekly.length?`<h2>정기 청소 (오늘)</h2><div class="list">${weekly.map(([id,l])=>itemRow(id,l)).join('')}</div>`:''}
+    <h2>마지막</h2><div class="list">${FINAL.map(([id,l])=>itemRow(id,l)).join('')}</div>
+    <h2>월간 청소</h2><p class="hint">체크 안 해도 마감은 됩니다. 이번 달에 한 번만 하면 됩니다.</p>
+    <div class="list">${MONTHLY.map(([id,l])=>{const on=S.monthly.checks[id];return `<button class="row ${on?'on-check':''}" data-act="mck" data-id="${id}"><span class="check">✓</span><span class="main">${l}${on?`<span class="sub">${on} 완료</span>`:''}</span></button>`;}).join('')}</div>
+    <button class="big-btn" data-act="closedone" ${st.done===st.total?'':'disabled'}>${st.done===st.total?'마감 완료하기':`${st.total-st.done}개 남음`}</button>`;
+}
+function sheetCash(){
+  openSheet(`<h2>마감정산 · 시재</h2><p class="hint">시재를 맞춰보고 알려 주세요.</p>
+    <div class="two"><button class="big-btn" data-act="cashok">시재 맞음</button><button class="big-btn" style="background:var(--beef)" data-act="cashshort">시재 부족</button></div>
+    <button class="link-btn" data-act="cashlater">나중에 하기</button>`);
+}
+let cashM=0,cashK=0;
+function sheetShort(){
+  const sum=cashM*10000+cashK*1000;
+  openSheet(`<h2>얼마가 비었습니까?</h2><p class="hint">부족한 만큼만 눌러 주세요.</p>
+    <div class="cashrow"><b>만원</b><span class="qty"><button data-act="cm" data-d="-1">−</button><output class="num">${cashM}</output><button data-act="cm" data-d="1">+</button></span></div>
+    <div class="cashrow"><b>천원</b><span class="qty"><button data-act="ck1" data-d="-1">−</button><output class="num">${cashK}</output><button data-act="ck1" data-d="1">+</button></span></div>
+    <div class="cashsum num">${won(sum)} 부족</div>
+    <button class="big-btn" style="background:var(--beef)" data-act="cashsend" ${sum?'':'disabled'}>사장님께 알리고 완료</button>
+    <button class="link-btn" data-act="cashback">다시 고르기</button>`);
+}
+async function finishClose(cash){
+  const carried=Object.keys(S.close.carry).filter(k=>S.close.carry[k]).map(k=>LABEL[k]);
+  flushChecks();
+  if(cash>0) await API.post(STORE.closeGas,{action:'cash',date:BD_KEY,short:cash,device:DEVICE,branch:STORE.branch});
+  await API.post(STORE.closeGas,{action:'complete',date:BD_KEY});
+  if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
+  S.close.done=hhmm(); S.close.cash=cash==null?null:cash; save(); closeSheet(); rerender();
+  toast(carried.length?`마감 완료. 내일 오픈으로 ${carried.length}개 넘김`:'마감 완료');
+}
+
+/* ══════════════ 서버 동기화 ══════════════ */
+let ckQ={}, ckT=null;
+function queueCheck(mode,id,checked){ ckQ[mode+'|'+id]={mode,id,checked,at:hhmm()}; clearTimeout(ckT); ckT=setTimeout(flushChecks,1500); }
+function flushChecks(){
+  const all=Object.values(ckQ); ckQ={};
+  ['open','close'].forEach(m=>{ const items=all.filter(x=>x.mode===m).map(({id,checked,at})=>({id,checked,at}));
+    if(items.length) API.post(STORE.closeGas,{action:'checks',date:BD_KEY,mode:m,branch:STORE.branch,device:DEVICE,ua:UA,items}).catch(()=>{ items.forEach(it=>{ if(!ckQ[m+'|'+it.id]) ckQ[m+'|'+it.id]={mode:m,...it}; }); }); });
+}
+async function loadMonthly(){
+  const r=await API.jsonp(STORE.closeGas,{action:'monthly',month:MONTH_KEY}); if(!r||!r.checks) return;
+  MONTHLY.forEach(([id])=>{ const c=r.checks[id]; S.monthly.checks[id]= c&&c.checked ? (c.at||c.date||'완료') : null; });
+  save(); if(cur==='t-close') rerender();
+}
+
+/* 식자재 바구니 — 서버가 유일한 진실. 체크하면 화면 먼저, 0.8초 모아서 서버로 */
+let cartQ={}, cartT=null, lastOp=0;
+function queueCart(k){
+  lastOp=Date.now(); const [sup,item]=k.split(':'); if(sup==='주류') return;
+  const c=S.food.cart[k]||{on:false,qty:''};
+  cartQ[k]={supplier:sup,item,qty:c.on?String(c.qty||''):'',off:!c.on,phone:STORE.phones[sup]||''};
+  clearTimeout(cartT); cartT=setTimeout(flushCart,800);
+}
+function flushCart(){ const items=Object.values(cartQ); cartQ={}; if(items.length) API.post(STORE.orderGas,{type:'cart_set',device:DEVICE,items}); }
+async function readCart(force){
+  if(!LIVE) return; if(!force && Date.now()-lastOp<6000) return;
+  const r=await API.jsonp(STORE.orderGas,{action:'cart'}); if(!r||!r.ok) return;
+  if(!force && Date.now()-lastOp<6000) return;
+  const cart={}, srcs={};
+  (r.items||[]).forEach(b=>{ if(b.supplier==='주류') return; const k=b.supplier+':'+b.item, q=parseFloat(b.qty);
+    const c=cart[k]||{on:true,qty:''}; if(isFinite(q)) c.qty=(parseFloat(c.qty)||0)+q; cart[k]=c; if(b.src) srcs[b.src]=true; });
+  Object.keys(S.food.cart).forEach(k=>{ if(k.startsWith('주류:')) cart[k]=S.food.cart[k]; });
+  S.food.cart=cart; S.food.srcs=srcs; S.food.sentSups=r.sent||{}; save();
+  if(cur==='t-food'||cur==='t-close') rerender();
+}
+function 주류Msgs(){
+  const sup=supOf('주류'), parts=[]; let sum=0;
+  sup.items.forEach(i=>{ if(kindOf(sup,i)==='stock'){ const o=stockOrder(i); if(o>0){ parts.push(`${i} ${o}`); sum+=o; } }
+    else if(cartQty('주류',i)){ parts.push(i); sum+=1; } });
+  if(!parts.length) return {msgs:[],sum:0};
+  const del=isDelayed(), d=new Date(BD); d.setDate(d.getDate()+(del?(WD===1?2:1):1));
+  const body=`[백석점 발주 ${d.getMonth()+1}/${d.getDate()}(${DAY[d.getDay()]})]\n${parts.join(', ')}`;
+  let n=0; for(const ch of body){ const c=ch.charCodeAt(0); n+=c<=0x7F?1:c<=0x7FF?2:3; }
+  return {sum, msgs:[{supplier:'주류',phone:STORE.phones['주류'],body,channel:n<=90?'SMS':n<=2000?'LMS':'KAKAO',items:parts}]};
+}
+
+function cartAdd(id,rows){
+  rows.forEach(([sup,item,q])=>{ const k=sup+':'+item, c=S.food.cart[k]||{on:false,qty:''}; const was=c.on?(parseFloat(c.qty)||0):0; c.on=true; c.qty=(kindOf(supOf(sup),item)==='qty'||was)?was+q:''; S.food.cart[k]=c; });
+  S.food.srcs[id]=true; S.food.fromClose++; lastOp=Date.now(); save(); rerender();
+  toast('🛒 '+rows.map(r=>r[0]+' '+r[1]+(r[2]>1?' '+r[2]:'')).join(', ')+' 담음');
+  API.post(STORE.orderGas,{type:'cart_add',device:DEVICE,items:rows.map(([sup,item,q])=>({supplier:sup,item,qty:String(q),src:id}))});
+  setTimeout(()=>readCart(true),1500);
+}
+function cartRemove(id,rows){
+  rows.forEach(([sup,item,q])=>{ const k=sup+':'+item, c=S.food.cart[k]; if(!c) return; const left=(parseFloat(c.qty)||0)-q; if(left>0) c.qty=left; else S.food.cart[k]={on:false,qty:''}; });
+  delete S.food.srcs[id]; S.food.fromClose=Math.max(0,S.food.fromClose-1); lastOp=Date.now(); save(); rerender(); toast('🛒 뺐습니다');
+  API.post(STORE.orderGas,{type:'cart_remove',device:DEVICE,items:rows.map(([sup,item])=>({supplier:sup,item,src:id}))});
+  setTimeout(()=>readCart(true),1500);
+}
+
+/* ══════════════ 영수증 (기존 영수증 분석기와 같은 방식) ══════════════
+   ① 사진: 유형 선택 → 사진 → 목록 → 모두 제출
+      · 원본으로 지문(SHA-256)을 내서 같은 사진 두 번 올리기를 막습니다
+      · 1600px · 품질 0.85 로 줄여서 보냅니다
+      · 보낸 뒤 「들어갔나」를 서버에 다시 물어 확인합니다 (거짓 실패 방지)
+   ② 금액만: 계정 → 금액 → 날짜 → 기록
+   ══════════════════════════════════════════════════════════ */
+const R = { doc:'', dir:'', queue:[], running:false, amt:'', date:BD_KEY, memo:'' };
+const demoHashes = new Set();
+function rRcpt(){
+  const qIcon=st=>({'대기':'🕐','업로드중':'⏳','완료':'✅','이미있음':'♻️','확인못함':'⚠️','오류':'❌'}[st]);
+  const waiting=R.queue.filter(q=>q.status==='대기').length;
+  $('#t-rcpt').innerHTML = `
+    ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
+    <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. 여러 장도 됩니다.</p>
+    <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
+    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row"><img class="thumb" src="${q.thumb}" alt=""><span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}</div>`).join('')}</div>
+      <button class="big-btn" data-act="rsubmit" ${waiting&&!R.running?'':'disabled'}>${R.running?'올리는 중…':`모두 제출하기 (${waiting}장)`}</button>`:''}
+
+    <h2>② 금액만 적을 것</h2><p class="hint">영수증 없이 금액만 넣는 것들입니다.</p>
+    <div class="doc-grid">${DIRECT_TYPES.map(([v,e,l,s])=>`<button class="doc" data-act="rdir" data-v="${v}" aria-pressed="${R.dir===v}"><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</button>`).join('')}</div>
+    <div class="fields"><input class="field num" id="rAmt" inputmode="numeric" placeholder="금액 (원)" value="${R.amt}"><input class="field" id="rDate" type="date" value="${R.date}"></div>
+    <input class="field" id="rMemo" placeholder="메모 (선택)" value="${esc(R.memo)}" style="margin-top:8px">
+    <button class="big-btn" data-act="rdirect" id="rDirBtn" ${R.dir&&numAmt()>0&&R.date?'':'disabled'}>기록하기</button>`;
+}
+const numAmt=()=>parseInt((R.amt||'').replace(/[^0-9]/g,'')||'0',10);
+async function fingerprint(file){
+  try{ const d=await crypto.subtle.digest('SHA-256',await file.arrayBuffer()); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''); }catch(e){ return ''; }
+}
+function shrink(file){
+  return new Promise((ok,no)=>{ const r=new FileReader(); r.onerror=no; r.onload=e=>{ const img=new Image(); img.onerror=no; img.onload=()=>{
+    let w=img.width,h=img.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
+    const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+    const url=c.toDataURL('image/jpeg',0.85); const t=document.createElement('canvas'); const s=120/Math.max(w,h); t.width=w*s;t.height=h*s; t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+    ok({b64:url.split(',')[1], thumb:t.toDataURL('image/jpeg',0.7)}); }; img.src=e.target.result; }; r.readAsDataURL(file); });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+/* 🔴 되묻는 간격 (26-10-01 고침)
+   전에는 2.5초 + 3.5초 = 6초만 기다렸습니다. 그런데 서버가 하는 일이
+   시트 읽기 → 파일 만들기 → 시트 쓰기로 4~8초입니다.
+   그래서 잘 들어갔는데도 「확인 못 했습니다」가 떴습니다.
+   ⚠️ 대부분 첫 3초에 끝납니다. 안 끝났을 때만 더 기다립니다. */
+const 되묻기간격 = [3000, 5000, 8000, 12000];
+async function runQueue(){
+  R.running=true; rerender();
+  for(const q of R.queue){
+    if(q.status!=='대기') continue;
+    q.status='업로드중'; rerender();
+    q.hash = await q.hash;          // ⚠️ 지문 계산이 끝날 때까지 기다립니다
+    const before = await API.photoExists(q.hash);
+    if(before){ q.status='이미있음'; q.err='전에 올린 사진입니다'+(before.시각?` (${before.시각})`:''); rerender(); continue; }
+    try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷 연결을 확인하고 다시 시도하세요'; rerender(); continue; }
+    if(!q.hash){ q.status='완료'; rerender(); continue; }
+
+    let got;
+    for(const ms of (API.RECEIPT_LIVE?되묻기간격:[300])){
+      await wait(ms);
+      got = await API.photoExists(q.hash);
+      if(got) break;                // 들어갔다
+      if(got===undefined) continue;  // 못 물어봤다 — 한 번 더
+      // got===null : 아직 안 보인다 — 서버가 느릴 수 있으니 한 번 더
+    }
+    if(got) q.status='완료';
+    else if(got===null){ q.status='오류'; q.err='서버에 안 들어갔습니다. 다시 시도하세요'; }
+    else { q.status='확인못함'; q.err='올라간 것 같은데 확인을 못 했습니다. 다시 올려도 중복되지 않습니다'; }
+    q.b64=null; rerender();
+  }
+  R.running=false; rerender();
+  const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`영수증 ${n}장 올림. 새벽에 자동 분석됩니다`);
+}
+
+/* ══════════════ 숫자판 / 아래 판 ══════════════ */
+function openSheet(html){ $('#sheet').innerHTML=html; $('#ov').classList.add('show'); }
+function closeSheet(){ $('#ov').classList.remove('show'); }
+let pad=null;
+function openPad(path,unit,title,dec){
+  const v=get(path); pad={path,unit,dec,buf:v==null?'':String(v)}; drawPad(title);
+}
+function drawPad(title){
+  pad.title=title||pad.title;
+  openSheet(`<h2>${esc(pad.title)}</h2><div class="pad-disp num">${pad.buf||'0'}<small>${pad.unit}</small></div>
+    <div class="pad">${['1','2','3','4','5','6','7','8','9',pad.dec?'.':'','0','⌫'].map(k=>k?`<button data-act="pk" data-k="${k}">${k}</button>`:'<span></span>').join('')}</div>
+    <div class="two" style="margin-top:12px"><button class="big-btn sec" data-act="pclear">지우기</button><button class="big-btn" data-act="pok">확인</button></div>`);
+}
+
+/* ══════════════ 누르기 ══════════════ */
+document.addEventListener('click', async e=>{
+  if(e.target.id==='ov'){ closeSheet(); return; }
+  const b=e.target.closest('button'); if(!b) return;
+  const a=b.dataset.act;
+  if(b.dataset.tab){ go(b.dataset.tab,b.dataset.mode); return; }
+  switch(a){
+    /* 숫자판 */
+    case 'pad': openPad(b.dataset.path,b.dataset.unit,b.dataset.title,b.dataset.dec==='1'); break;
+    case 'pk': { const k=b.dataset.k;
+      if(k==='⌫') pad.buf=pad.buf.slice(0,-1);
+      else if(k==='.'){ if(!pad.buf.includes('.')) pad.buf=(pad.buf||'0')+'.'; }
+      else if(pad.buf.length<5) pad.buf=(pad.buf==='0'?'':pad.buf)+k;
+      drawPad(); break; }
+    case 'pclear': set(pad.path,null); closeSheet(); rerender(); break;
+    case 'pok': { const n=parseFloat(pad.buf); set(pad.path,isFinite(n)?n:null); closeSheet(); rerender(); break; }
+
+    /* 오늘 · 오픈 */
+    case 'openck': { const id=b.dataset.id; S.close.openChecks[id]=!S.close.openChecks[id]; save(); rerender(); queueCheck('open', id.startsWith('cy_')?id.slice(3):id, !!S.close.openChecks[id]); break; }
+    case 'opendone': flushChecks(); await API.post(STORE.closeGas,{action:'completeOpen',date:BD_KEY,carried:(Y?Y.carry:[]).map(c=>c.label).join(', ')}); S.close.openDone=hhmm()+' 완료'; save(); rerender(); toast('오픈 완료'); break;
+
+    /* 고기 */
+    case 'meatmode': S.meat.mode=b.dataset.v; save(); rerender(); break;
+    case 'mcmax': S.meat.order.mcMax=!S.meat.order.mcMax; save(); rerender(); break;
+    case 'chip': { const arr=get(b.dataset.path), v=b.dataset.v, i=arr.indexOf(v); i<0?arr.push(v):arr.splice(i,1); save(); rerender(); break; }
+    case 'sendmeat': { const k=b.dataset.v, msg=meatMsg(k);
+      if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
+      openSheet(`<h2>사장님께 갈 문자</h2><div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
+    case 'sendmeatok': { const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
+      await API.post(STORE.orderGas, k==='order'
+        ? {type:'order',branch:STORE.meatBranch,gc_use:n(o.use),gc_done:n(o.done),gc_ing:n(o.ing),dc:n(o.dc),mc:o.mcMax?0:n(o.mc),mc_max:!!o.mcMax,extras:o.extras,date:realDateStr(),monday_delay:new Date().getDay()===1}
+        : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()}); S.meat.sent[k]=hhmm(); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄'); break; }
+
+    /* 식자재 */
+    case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
+    case 'ft': { const c=S.food.cart[b.dataset.k]||{on:false,qty:''}; c.on=!c.on; if(!c.on) c.qty=''; S.food.cart[b.dataset.k]=c; save(); rerender(); queueCart(b.dataset.k); break; }
+    case 'fq': { const c=S.food.cart[b.dataset.k]||{on:false,qty:0}; c.qty=Math.max(0,(c.on?(+c.qty||0):0)+ +b.dataset.d); c.on=c.qty>0; S.food.cart[b.dataset.k]=c; save(); rerender(); queueCart(b.dataset.k); break; }
+    case 'foodpreview': { const J=주류Msgs(); if(J.sum>0&&J.sum<3){ toast(`🍶 주류는 합쳐서 3개부터 주문됩니다 (지금 ${J.sum}개)`); break; } const L=foodLines();
+      openSheet(`<h2>발주 미리보기</h2><p class="hint">백석점 · 발송 전 확인</p><div class="list">${L.map(l=>`<div class="row"><span class="main"><b>${l.emoji} ${l.sup}</b>${l.sent?`<span class="sub" style="color:var(--done)">📨 ${l.sent}에 이미 한 번 나갔습니다</span>`:''}<span class="sub" style="color:var(--ink)">${esc(l.text)||'—'}</span>${l.note?`<span class="sub" style="color:var(--beef)">${l.note}</span>`:''}</span></div>`).join('')}</div>
+        <button class="big-btn" data-act="foodsend">📨 발주하기</button><button class="link-btn" data-act="close">더 담기</button>`); break; }
+    case 'foodsend': {
+      if(b.disabled) break; b.disabled=true; b.textContent='보내는 중…';
+      clearTimeout(cartT); flushCart();
+      const items=[];
+      SUPS.filter(x=>x.key!=='주류').forEach(sp=>sp.items.forEach(i=>{ const c=S.food.cart[sp.key+':'+i]; if(c&&c.on) items.push({supplier:sp.key,item:i,qty:c.qty?String(c.qty):'',phone:STORE.phones[sp.key]||''}); }));
+      const J=주류Msgs();
+      if(items.length){
+        if(LIVE){ try{ await wait(900); const r=await fetch(STORE.orderGas,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({type:'cart_send',device:DEVICE,items})}); await r.json().catch(()=>null); }catch(e){ /* 답을 못 받아도 서버는 보냈을 수 있습니다. 실패라고 하지 않습니다 */ } }
+        else console.log('[미리보기] 안 보냄', items);
+        items.forEach(it=>{ const k=it.supplier+':'+it.item; S.food.cart[k]={on:false,qty:''}; cartQ[k]={supplier:it.supplier,item:it.item,qty:'',off:true,phone:it.phone}; });
+        flushCart(); lastOp=0;
+      }
+      if(J.msgs.length) await API.post(STORE.orderGas,{type:'food_order',branch:STORE.branch,delay_to_tuesday:isDelayed(),messages:J.msgs});
+      S.food.sent=hhmm(); S.food.stock={}; Object.keys(S.food.cart).forEach(k=>{ if(k.startsWith('주류:')) delete S.food.cart[k]; }); S.food.fromClose=0;
+      save(); closeSheet(); rerender(); toast(isDelayed()?'저장했습니다. 화요일 20:30에 나갑니다':'식자재 발주 보냄'); setTimeout(()=>readCart(true),2000); break; }
+
+    /* 마감 */
+    case 'closemode': S.close.mode=b.dataset.v; save(); rerender(); break;
+    case 'ck': { const id=b.dataset.id; S.close.checks[id]=!S.close.checks[id]; if(S.close.checks[id]) delete S.close.carry[id]; save(); rerender(); queueCheck('close',id,!!S.close.checks[id]); break; }
+    case 'carry': { const id=b.dataset.id; S.close.carry[id]=!S.close.carry[id]; if(S.close.carry[id]) S.close.checks[id]=false; save(); rerender(); break; }
+    case 'tocart': { const id=b.dataset.id, rows=발주표[id];
+      if(S.food.srcs[id]){ cartRemove(id,rows); break; }
+      if(rows.length===1){ cartAdd(id,rows); break; }
+      openSheet(`<h2>무엇이 떨어졌습니까?</h2><div class="list">${rows.map((r,i)=>`<button class="row" data-act="tocart2" data-id="${id}" data-i="${i}"><span class="main">${r[1]}<span class="sub">${r[0]}</span></span></button>`).join('')}<button class="row" data-act="tocart2" data-id="${id}" data-i="all"><span class="main">둘 다</span></button></div><button class="link-btn" data-act="close">닫기</button>`); break; }
+    case 'tocart2': { const id=b.dataset.id, rows=발주표[id]; closeSheet(); cartAdd(id, b.dataset.i==='all'?rows:[rows[+b.dataset.i]]); break; }
+    case 'mck': { const id=b.dataset.id; S.monthly.checks[id]=S.monthly.checks[id]?null:`${BD.getMonth()+1}/${BD.getDate()}`; save(); rerender(); API.post(STORE.closeGas,{action:'toggleMonthly',month:MONTH_KEY,itemId:id,checked:!!S.monthly.checks[id]}); break; }
+    case 'closedone': sheetCash(); break;
+    case 'cashok': finishClose(0); break;
+    case 'cashlater': finishClose(null); break;
+    case 'cashshort': cashM=0;cashK=0; sheetShort(); break;
+    case 'cm': cashM=Math.max(0,cashM+ +b.dataset.d); sheetShort(); break;
+    case 'ck1': cashK=Math.max(0,Math.min(9,cashK+ +b.dataset.d)); sheetShort(); break;
+    case 'cashsend': finishClose(cashM*10000+cashK*1000); break;
+    case 'cashback': sheetCash(); break;
+    case 'undo': S.close.done=false; S.close.cash=null; save(); rerender(); break;
+
+    /* 영수증 */
+    case 'rdel': R.queue.splice(+b.dataset.i,1); rerender(); break;
+    case 'rsubmit': runQueue(); break;
+    case 'rdir': R.dir=b.dataset.v; R.memo=''; rerender(); break;
+    case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)) break;
+      await API.direct(R.dir,amt,R.date,R.memo); toast(`기록함 · ${R.dir} ${won(amt)}`); R.dir='';R.amt='';R.memo=''; rerender(); break; }
+
+    case 'close': closeSheet(); break;
+  }
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSheet(); });
+document.addEventListener('change', async e=>{
+  if(e.target.dataset.act!=='rcpt') return;
+  R.doc = e.target.dataset.v;
+  const files=[...e.target.files]; e.target.value='';
+  for(const f of files){
+    const hash=fingerprint(f);   // ⚠️ 압축 전 원본으로, 기다리지 않고 약속을 담아 둡니다
+    try{ const {b64,thumb}=await shrink(f); R.queue.push({docType:R.doc,fname:f.name,b64,thumb,hash,status:'대기'}); }
+    catch(err){ toast('사진을 읽지 못했습니다: '+f.name); }
+    rerender();
+  }
+});
+document.addEventListener('input', e=>{
+  if(e.target.id==='rAmt'){ const el=e.target, back=el.value.length-el.selectionStart, n=el.value.replace(/[^0-9]/g,'');
+    el.value=n?Number(n).toLocaleString('ko-KR'):''; R.amt=el.value; const p=Math.max(0,el.value.length-back); try{el.setSelectionRange(p,p);}catch(_){}
+    $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
+  if(e.target.id==='rDate'){ R.date=e.target.value; $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
+  if(e.target.id==='rMemo'){ R.memo=e.target.value; }
+});
+
+/* ── 시작: 화면은 바로 띄우고, 어제 데이터는 뒤에서 채웁니다 ── */
+if(LIVE) $('#modePill').remove();
+$('#dateLabel').textContent = `백석점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[WD]}요일 · ${APP_VERSION}`;
+go('t-today');
+API.yesterday().then(d=>{ Y=d; window.Y=d; rerender(); });
+if(LIVE){
+  readCart(true); loadMonthly();
+  setInterval(()=>{ if(document.visibilityState==='visible') readCart(); },15000);
+  setInterval(()=>{ if(document.visibilityState==='visible') loadMonthly(); },30000);
+  // 영업일이 바뀌면(오전 8시) 새로 시작
+  setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(k!==BD_KEY) location.reload(); },60000);
+  // 화면을 떠날 때 못 보낸 체크를 마저 보냅니다
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ flushChecks(); flushCart(); } });
+}
+</script>
+</body>
+</html>
