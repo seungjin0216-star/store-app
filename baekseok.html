@@ -189,6 +189,8 @@ nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:
 .man-bad{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--beef) 12%,var(--surface));font-size:14px}
 .man-why{margin-top:10px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--warm) 14%,var(--surface));font-size:14px}
 .man-txt{white-space:pre-wrap;font-size:15px;line-height:1.7}
+.newver{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:40;background:var(--accent);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:700;font-size:15px;box-shadow:0 4px 16px #0003;display:none;white-space:nowrap}
+.newver.show{display:block}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--char);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
 .toast.show{opacity:1}
 
@@ -213,6 +215,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 <nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
 <div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<button class="newver" id="newver" type="button">🔄 새 버전이 나왔어요 · 눌러서 새로고침</button>
 
 <script>
 /* ══════════════════════════════════════════════════════════
@@ -223,7 +226,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-01-v4';
+const APP_VERSION = '2026-10-01-v5';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -1037,6 +1040,21 @@ document.addEventListener('input', e=>{
 if(LIVE) $('#modePill').remove();
 $('#dateLabel').textContent = `백석점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[WD]}요일 · ${APP_VERSION}`;
 
+/* 🔄 새 버전 알림 (26-10-01 · 제2의뇌 149)
+   폰은 옛 화면을 붙잡고 있을 수 있습니다 (홈 화면 앱 · 캐시). 「캐시로 세 번 헤맴」
+   → 서버의 이 파일을 다시 받아 APP_VERSION 을 비교하고, 다르면 위에 띠를 띄웁니다.
+   ⚠️ 저절로 새로고침하지 않습니다. 직원이 입력 중일 수 있습니다. 누르면 그때
+   ⚠️ 누르기 전에 못 보낸 체크·바구니를 먼저 보냅니다 (flush) */
+async function 새버전확인(){
+  if(!LIVE) return;
+  try{
+    const t = await (await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'})).text();
+    const m = t.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1]!==APP_VERSION) $('#newver').classList.add('show');
+  }catch(e){}
+}
+$('#newver').addEventListener('click',()=>{ try{ flushChecks(); flushCart(); }catch(e){} $('#newver').textContent='새로고침 중…'; setTimeout(()=>location.reload(),900); });
+
 /* 🔴 캐시가 있으면 **그리기 전에** 넣습니다. 그래야 첫 화면부터 「오늘은」이 보입니다 */
 const 캐시된어제 = LIVE ? API.readCache() : null;
 if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
@@ -1044,7 +1062,8 @@ if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
 go('t-today');
 API.yesterday().then(d=>{ Y=d; window.Y=d; rerender(); });
 if(LIVE){
-  readCart(true); loadMonthly(); load기준표(); readMeat();
+  readCart(true); loadMonthly(); load기준표(); readMeat(); setTimeout(새버전확인,5000);
+  setInterval(()=>{ if(document.visibilityState==='visible') 새버전확인(); },10*60000);
   setInterval(()=>{ if(document.visibilityState==='visible') readCart(); },15000);
   setInterval(()=>{ if(document.visibilityState==='visible' && (cur==='t-today'||cur==='t-meat')) readMeat(); },20000);
   setInterval(()=>{ if(document.visibilityState==='visible') loadMonthly(); },30000);
@@ -1052,7 +1071,7 @@ if(LIVE){
   setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(k!==BD_KEY) location.reload(); },60000);
   // 화면을 떠날 때 못 보낸 체크를 마저 보냅니다
-  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ flushChecks(); flushCart(); } });
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ flushChecks(); flushCart(); } else 새버전확인(); });
 }
 </script>
 </body>
