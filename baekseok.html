@@ -226,7 +226,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-02-v7';
+const APP_VERSION = '2026-10-02-v8';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -630,7 +630,7 @@ function rMeat(){
           ${m.order.mcMax?'':valBtn('meat.order.mc','보','막창 발주')}</div>
       </div>
       <h2>추가 주문</h2>${chips('meat.order.extras')}
-      <button class="big-btn" data-act="sendmeat" data-v="order">${m.sent.order?'다시 보내기':'발주 보내기'}</button>`;
+      <button class="big-btn" data-act="sendmeat" data-v="order" ${m.sent.order?'style="background:var(--warm)"':''}>${m.sent.order?'✏️ 정정해서 보내기':'발주 보내기'}</button>`;
   } else {
     el.innerHTML = seg
     + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
@@ -642,7 +642,7 @@ function rMeat(){
         <div class="row"><span class="main">박스</span>${valBtn('meat.recv.box','개','박스',false)}</div>
       </div>
       <h2>기타 입고</h2>${chips('meat.recv.extras')}
-      <button class="big-btn" data-act="sendmeat" data-v="recv">${m.sent.recv?'다시 보내기':'입고 보내기'}</button>`;
+      <button class="big-btn" data-act="sendmeat" data-v="recv" ${m.sent.recv?'style="background:var(--warm)"':''}>${m.sent.recv?'✏️ 정정해서 보내기':'입고 보내기'}</button>`;
   }
 }
 function meatMsg(kind){
@@ -999,14 +999,16 @@ document.addEventListener('click', async e=>{
     case 'sendmeat': { const k=b.dataset.v, msg=meatMsg(k);
       if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
       const 정정 = S.meat.sent[k];
-      openSheet(`<h2>${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 ${k==='order'?'발주':'입고'}가 있습니다</b><span>이걸 보내면 「⚠️ 정정 — 앞서 보낸 것 대신 이것」으로 갑니다${k==='recv'?'. 고기값도 이것으로만 잡힙니다':''}</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
+      openSheet(`<h2>${정정?'✏️ 정정 — ':''}${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 ${k==='order'?'발주':'입고'}가 있습니다</b><span>이걸 보내면 「⚠️ 정정 — 앞서 보낸 것 대신 이것」으로 갑니다${k==='recv'?'. 고기값도 이것으로만 잡힙니다':''}</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}" ${정정?'style="background:var(--warm)"':''}>${정정?'정정 보내기':(k==='order'?'발주 보내기':'입고 보내기')}</button><button class="link-btn" data-act="close">고치기</button>`); break; }
     case 'sendmeatok': { if(b.disabled) break; b.disabled=true;
       const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
       const body = k==='order'
         ? {type:'order',branch:STORE.meatBranch,gc_use:n(o.use),gc_done:n(o.done),gc_ing:n(o.ing),dc:n(o.dc),mc:o.mcMax?0:n(o.mc),mc_max:!!o.mcMax,extras:o.extras,date:realDateStr(),monday_delay:new Date().getDay()===1}
         : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()};
       const sig = 'meat:'+JSON.stringify(body);
-      if(recentSame(sig) && !confirm('방금 같은 내용을 보냈습니다. 정말 또 보낼까요?')){ closeSheet(); break; }
+      // 똑같은 내용은 정정이 아닙니다 — 이미 들어갔으니 안 보냅니다 (서버도 3분 안 같은 내용은 건너뜀)
+      // 숫자를 하나라도 고쳤으면 내용이 달라서 바로 정정으로 나갑니다
+      if(recentSame(sig)){ closeSheet(); toast('방금 똑같은 내용이 이미 들어갔습니다'); break; }
       markSent(sig);
       S.meat.sent[k]=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄');
       API.post(STORE.orderGas, body).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다. 20초 뒤 상태를 보세요'));
