@@ -42,7 +42,9 @@ body{height:100%;margin:0;background:var(--paper);color:var(--ink);
               "Malgun Gothic",system-ui,"Helvetica Neue",sans-serif;
   font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;word-break:keep-all;
   -webkit-font-smoothing:antialiased}
-button{font:inherit;color:inherit;cursor:pointer}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+/* ⚠️ 26-10-02 「페이지 넘기는 속도가 느림」 — 두 번 눌러 확대를 기다리는 틈(최대 0.3초)을 없앱니다 */
+html{touch-action:manipulation}
 .num{font-variant-numeric:tabular-nums}
 .wrap{max-width:480px;margin:0 auto}
 
@@ -119,6 +121,12 @@ h3{font-size:14px;color:var(--muted);font-weight:500;margin:16px 0 6px}
 .calc .big{font-size:26px;font-weight:700}
 .calc .sm{font-size:13px;opacity:.8}
 
+.ctabs{display:flex;gap:6px;margin:4px 0 12px;position:sticky;top:0;z-index:5;background:var(--paper);padding:6px 0}
+.ctabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 0;font-weight:600;font-size:14px;color:var(--muted)}
+.ctabs button small{display:block;font-size:11px;font-weight:700;opacity:.8}
+.ctabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ctabs button.all{border-color:var(--done);color:var(--done)}
+.ctabs button.all[aria-pressed="true"]{background:var(--done);color:#fff}
 .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0 4px}
 .bar i{display:block;height:100%;background:var(--done);transition:width .2s}
 
@@ -226,7 +234,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-02-v8';
+const APP_VERSION = '2026-10-02-v9';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -691,6 +699,10 @@ function rFood(){
     const on=c&&c.on;
     return `<button class="row ${on?'on-check':''}" data-act="ft" data-k="${key}"><span class="check">✓</span><span class="main" style="text-decoration:none;color:inherit">${item}</span></button>`;
   };
+  /* ⚠️ 26-10-02 사장님: 「주류를 누르면 업체 줄이 미락 쪽으로 쭉 땡겨짐」
+     화면을 통째로 다시 그리면서 옆으로 밀어둔 자리가 처음으로 돌아갔습니다.
+     → 그리기 전 자리를 기억했다가 그대로 돌려놓습니다 (15초마다 바구니를 다시 읽을 때도) */
+  const 옆자리 = (el.querySelector('.supbar')||{}).scrollLeft||0;
   el.innerHTML = `
     ${monTue?`<div class="banner warn"><span class="em">⚠️</span><div><b>월·화 발주 — 화요일 저녁 자동 발송</b><span>화요일 20:30에 업체로 나가고 수요일 납품. 월요일 14시 전 발주는 바로 나갑니다</span></div></div>`:''}
     ${나간업체.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 이미 나간 발주</b><span>${나간업체.map(k=>`${supOf(k).emoji} ${k} ${sentOf(k)}`).join(' · ')}</span></div></div>`:''}
@@ -704,6 +716,13 @@ function rFood(){
       ? sup.groups.map(g=>`<h3>${g.label}</h3><div class="list">${g.items.map(rowFor).join('')}</div>`).join('')
       : `<div class="list">${sup.items.map(rowFor).join('')}</div>`}
     <button class="big-btn" data-act="foodpreview" ${total?'':'disabled'}>미리보기 (${total}개)</button>`;
+  const bar=el.querySelector('.supbar'); if(bar) bar.scrollLeft=옆자리;
+}
+/* 고른 업체가 화면 밖에 반쯤 걸쳐 있으면 그만큼만 밀어 보이게 합니다 (처음으로 돌아가지 않음) */
+function 업체보이기(){
+  const bar=$('#t-food .supbar'), b=bar&&bar.querySelector('[aria-pressed="true"]'); if(!b) return;
+  const br=bar.getBoundingClientRect(), r=b.getBoundingClientRect();
+  if(r.left<br.left+16) bar.scrollLeft-=br.left+16-r.left; else if(r.right>br.right-16) bar.scrollLeft+=r.right-(br.right-16);
 }
 function foodLines(){
   const out=[];
@@ -763,25 +782,52 @@ function rClose(){
       + `<button class="big-btn sec" data-act="undo">완료 취소하기</button>`;
     return;
   }
+  /* ⚠️ 26-10-02 사장님: 「원래는 상단탭을 두어서 보여줬음 … 채우기·청소·마지막·정기」
+        「찬냉장고 하단(좌측)처럼 다 펼쳐지면 불편하니 아코디언」
+     → 예전 마감체크리스트(마감체크리스트/index.html 탭_)와 같은 네 칸 탭 + 묶음은 접힌 채로 시작
+     ⚠️ 펼친 묶음은 체크할 때 다시 그려도 그대로 둡니다 (펼친묶음). 묶음을 다 하면 저절로 접힙니다 */
   const st=closeStat(), pct=Math.round(st.done/st.total*100);
-  const fillHtml = FILL.map(e=>{
-    if(Array.isArray(e)) return itemRow(e[0],e[1]);
-    const n=e.items.filter(([id])=>c.checks[id]||c.carry[id]).length;
-    return `<details class="grp" ${n<e.items.length?'open':''}><summary><span class="main" style="flex:1">${e.label}</span><span class="tag ${n===e.items.length?'ok':'wait'} num">${n}/${e.items.length}</span></summary>${e.items.map(([id,l])=>itemRow(id,l)).join('')}</details>`;
-  }).join('');
+  const 됨=id=>c.checks[id]||c.carry[id];
   const weekly=WEEKLY.filter(w=>w[2]===WD);
-  el.innerHTML = seg + `
-    <div class="num" style="display:flex;justify-content:space-between;font-size:14px"><span>전체 진행</span><b>${st.done}/${st.total}</b></div>
+  const 칸 = 마감칸(weekly);
+  const sub = 칸[c.sub] ? c.sub : 'fill';
+  const 셈 = ids=>ids.filter(됨).length;
+  const grp=(key,label,items)=>{ const n=items.filter(([id])=>됨(id)).length;
+    return `<details class="grp" data-g="${key}" ${펼친묶음.has(key)?'open':''}><summary><span class="main" style="flex:1">${label}</span><span class="tag ${n===items.length?'ok':'wait'} num">${n}/${items.length}</span></summary>${items.map(([id,l])=>itemRow(id,l)).join('')}</details>`; };
+  const tabs = `<div class="ctabs" role="group" aria-label="마감 구역">${Object.entries(칸).map(([k,v])=>{ const n=셈(v.ids), all=v.ids.length&&n===v.ids.length;
+    return `<button data-act="closesub" data-v="${k}" aria-pressed="${k===sub}" class="${all?'all':''}">${v.label}<small class="num">${v.ids.length?`${n}/${v.ids.length}`:'–'}</small></button>`; }).join('')}</div>`;
+  let body='';
+  if(sub==='fill'){
+    body = `<p class="hint">🛒 누르면 식자재 발주에 담기고(다시 누르면 빠짐), ↪ 누르면 내일 오픈으로 넘어갑니다.</p>
+      <div class="list">${FILL.map(e=>Array.isArray(e)?itemRow(e[0],e[1]):grp(e.g,e.label,e.items)).join('')}</div>`;
+  } else if(sub==='clean'){
+    body = `<div class="list">${CLEAN.map((g,i)=>grp('clean'+i,g.label,g.items)).join('')}</div>`;
+  } else if(sub==='final'){
+    body = `<div class="list">${FINAL.map(([id,l])=>itemRow(id,l)).join('')}</div>`;
+  } else {
+    body = (weekly.length?`<h2>정기 청소 (오늘)</h2><div class="list">${weekly.map(([id,l])=>itemRow(id,l)).join('')}</div>`:`<p class="hint">오늘은 정기 청소가 없습니다.</p>`)
+      + `<h2>월간 청소</h2><p class="hint">체크 안 해도 마감은 됩니다. 이번 달에 한 번만 하면 됩니다.</p>
+      <div class="list">${MONTHLY.map(([id,l])=>{const on=S.monthly.checks[id];return `<button class="row ${on?'on-check':''}" data-act="mck" data-id="${id}"><span class="check">✓</span><span class="main">${l}${on?`<span class="sub">${on} 완료</span>`:''}</span></button>`;}).join('')}</div>`;
+  }
+  el.innerHTML = seg + tabs + body + `
+    <div class="num" style="display:flex;justify-content:space-between;font-size:14px;margin-top:18px"><span>전체 진행</span><b>${st.done}/${st.total}</b></div>
     <div class="bar"><i style="width:${pct}%"></i></div>
-    <p class="hint">🛒 누르면 식자재 발주에 담기고(다시 누르면 빠짐), ↪ 누르면 내일 오픈으로 넘어갑니다.</p>
-    <h2>채우기</h2><div class="list">${fillHtml}</div>
-    ${CLEAN.map(g=>`<h2>청소 · ${g.label}</h2><div class="list">${g.items.map(([id,l])=>itemRow(id,l)).join('')}</div>`).join('')}
-    ${weekly.length?`<h2>정기 청소 (오늘)</h2><div class="list">${weekly.map(([id,l])=>itemRow(id,l)).join('')}</div>`:''}
-    <h2>마지막</h2><div class="list">${FINAL.map(([id,l])=>itemRow(id,l)).join('')}</div>
-    <h2>월간 청소</h2><p class="hint">체크 안 해도 마감은 됩니다. 이번 달에 한 번만 하면 됩니다.</p>
-    <div class="list">${MONTHLY.map(([id,l])=>{const on=S.monthly.checks[id];return `<button class="row ${on?'on-check':''}" data-act="mck" data-id="${id}"><span class="check">✓</span><span class="main">${l}${on?`<span class="sub">${on} 완료</span>`:''}</span></button>`;}).join('')}</div>
     <button class="big-btn" data-act="closedone" ${st.done===st.total?'':'disabled'}>${st.done===st.total?'마감 완료하기':`${st.total-st.done}개 남음`}</button>`;
 }
+const 펼친묶음 = new Set();
+function 마감칸(weekly){ return {
+  fill:{label:'채우기', ids:FILL_FLAT.map(x=>x.id)},
+  clean:{label:'청소', ids:CLEAN.flatMap(g=>g.items.map(i=>i[0]))},
+  final:{label:'마지막', ids:FINAL.map(f=>f[0])},
+  etc:{label:'정기', ids:(weekly||WEEKLY.filter(w=>w[2]===WD)).map(w=>w[0])},
+};}
+/* 이 항목이 든 묶음 — 묶음을 다 하면 접으려고 */
+function 묶음키(id){
+  const f=FILL.find(e=>!Array.isArray(e)&&e.items.some(i=>i[0]===id)); if(f) return {key:f.g,items:f.items};
+  const i=CLEAN.findIndex(g=>g.items.some(x=>x[0]===id)); if(i>=0) return {key:'clean'+i,items:CLEAN[i].items};
+  return null;
+}
+document.addEventListener('toggle', e=>{ const d=e.target; if(d.matches && d.matches('details.grp[data-g]')){ d.open?펼친묶음.add(d.dataset.g):펼친묶음.delete(d.dataset.g); } }, true);
 function sheetCash(){
   openSheet(`<h2>마감정산 · 시재</h2><p class="hint">시재를 맞춰보고 알려 주세요.</p>
     <div class="two"><button class="big-btn" data-act="cashok">시재 맞음</button><button class="big-btn" style="background:var(--beef)" data-act="cashshort">시재 부족</button></div>
@@ -802,12 +848,17 @@ async function finishClose(cash){
   document.querySelectorAll('#sheet button').forEach(x=>x.disabled=true);
   const carried=Object.keys(S.close.carry).filter(k=>S.close.carry[k]).map(k=>LABEL[k]);
   flushChecks();
-  if(cash>0) await API.post(STORE.closeGas,{action:'cash',date:BD_KEY,short:cash,device:DEVICE,branch:STORE.branch});
-  await API.post(STORE.closeGas,{action:'complete',date:BD_KEY});
-  if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
+  /* ⚠️ 26-10-02 「오픈·마감 했을 때 속도가 너무 느림」
+     서버 세 곳을 하나씩 기다린 뒤에야 화면이 바뀌었습니다 (깨우는 데만 2~5초씩).
+     → 화면 먼저 「완료」, 보내기는 뒤에서. 순서(시재 → 완료 → 넘기기)는 그대로 지킵니다 */
   S.close.done=hhmm(); S.close.cash=cash==null?null:cash; save(); closeSheet(); rerender();
   toast(carried.length?`마감 완료. 내일 오픈으로 ${carried.length}개 넘김`:'마감 완료');
   closing=false;
+  (async()=>{
+    if(cash>0) await API.post(STORE.closeGas,{action:'cash',date:BD_KEY,short:cash,device:DEVICE,branch:STORE.branch});
+    await API.post(STORE.closeGas,{action:'complete',date:BD_KEY});
+    if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
+  })().catch(()=>toast('⚠️ 인터넷이 끊겨 마감 기록이 못 갔을 수 있습니다. 와이파이 확인 후 사장님께 알려 주세요'));
   // 🔔 사장님 (26-10-02): 「마감체크가 완료되었을때 알림이 울리게끔」 → 사장앱 + 다른 직원 폰 (누른 폰은 빼고)
   //    ⚠️ 답장을 안 기다립니다 (no-cors). 알림이 안 가도 마감은 이미 끝났습니다
   if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length})}).catch(()=>{});
@@ -896,14 +947,14 @@ function cartRemove(id,rows){
 const R = { doc:'', dir:'', queue:[], running:false, amt:'', date:BD_KEY, memo:'' };
 const demoHashes = new Set();
 function rRcpt(){
-  const qIcon=st=>({'대기':'🕐','업로드중':'⏳','완료':'✅','이미있음':'♻️','확인못함':'⚠️','오류':'❌'}[st]);
-  const waiting=R.queue.filter(q=>q.status==='대기').length;
+  const qIcon=st=>({'준비중':'…','대기':'🕐','업로드중':'⏳','확인중':'🔄','완료':'✅','이미있음':'♻️','확인못함':'⚠️','오류':'❌'}[st]);
+  const waiting=R.queue.filter(q=>q.status==='대기'&&q.b64).length, 준비=R.queue.filter(q=>q.status==='준비중').length;
   $('#t-rcpt').innerHTML = `
     ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
     <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. 여러 장도 됩니다.</p>
     <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
-    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row"><img class="thumb" src="${q.thumb}" alt=""><span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}</div>`).join('')}</div>
-      <button class="big-btn" data-act="rsubmit" ${waiting&&!R.running?'':'disabled'}>${R.running?'올리는 중…':`모두 제출하기 (${waiting}장)`}</button>`:''}
+    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}</div>`).join('')}</div>
+      <button class="big-btn" data-act="rsubmit" ${waiting&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
 
     <h2>② 금액만 적을 것</h2><p class="hint">영수증 없이 금액만 넣는 것들입니다.</p>
     <div class="doc-grid">${DIRECT_TYPES.map(([v,e,l,s])=>`<button class="doc" data-act="rdir" data-v="${v}" aria-pressed="${R.dir===v}"><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</button>`).join('')}</div>
@@ -915,7 +966,21 @@ const numAmt=()=>parseInt((R.amt||'').replace(/[^0-9]/g,'')||'0',10);
 async function fingerprint(file){
   try{ const d=await crypto.subtle.digest('SHA-256',await file.arrayBuffer()); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''); }catch(e){ return ''; }
 }
-function shrink(file){
+/* 사진 줄이기 — createImageBitmap 이 되면 그걸로 (폰에서 몇 배 빠르고 메모리를 덜 씀) */
+async function shrink(file){
+  if(window.createImageBitmap){
+    try{
+      const bm=await createImageBitmap(file,{imageOrientation:'from-image'});
+      let w=bm.width,h=bm.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
+      const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(bm,0,0,w,h); bm.close&&bm.close();
+      const url=c.toDataURL('image/jpeg',0.85); const t=document.createElement('canvas'); const sc=120/Math.max(w,h); t.width=w*sc;t.height=h*sc; t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+      c.width=c.height=0;
+      return {b64:url.split(',')[1], thumb:t.toDataURL('image/jpeg',0.7)};
+    }catch(e){ /* 안 되면 아래 옛 방식 */ }
+  }
+  return shrinkOld(file);
+}
+function shrinkOld(file){
   return new Promise((ok,no)=>{ const r=new FileReader(); r.onerror=no; r.onload=e=>{ const img=new Image(); img.onerror=no; img.onload=()=>{
     let w=img.width,h=img.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
     const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
@@ -928,31 +993,49 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    시트 읽기 → 파일 만들기 → 시트 쓰기로 4~8초입니다.
    그래서 잘 들어갔는데도 「확인 못 했습니다」가 떴습니다.
    ⚠️ 대부분 첫 3초에 끝납니다. 안 끝났을 때만 더 기다립니다. */
-const 되묻기간격 = [3000, 5000, 8000, 12000];
-async function runQueue(){
-  R.running=true; rerender();
-  for(const q of R.queue){
-    if(q.status!=='대기') continue;
-    q.status='업로드중'; rerender();
-    q.hash = await q.hash;          // ⚠️ 지문 계산이 끝날 때까지 기다립니다
-    const before = await API.photoExists(q.hash);
-    if(before){ q.status='이미있음'; q.err='전에 올린 사진입니다'+(before.시각?` (${before.시각})`:''); rerender(); continue; }
-    try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷 연결을 확인하고 다시 시도하세요'; rerender(); continue; }
-    if(!q.hash){ q.status='완료'; rerender(); continue; }
-
-    let got;
-    for(const ms of (API.RECEIPT_LIVE?되묻기간격:[300])){
-      await wait(ms);
-      got = await API.photoExists(q.hash);
-      if(got) break;                // 들어갔다
-      if(got===undefined) continue;  // 못 물어봤다 — 한 번 더
-      // got===null : 아직 안 보인다 — 서버가 느릴 수 있으니 한 번 더
-    }
-    if(got) q.status='완료';
-    else if(got===null){ q.status='오류'; q.err='서버에 안 들어갔습니다. 다시 시도하세요'; }
-    else { q.status='확인못함'; q.err='올라간 것 같은데 확인을 못 했습니다. 다시 올려도 중복되지 않습니다'; }
-    q.b64=null; rerender();
+/* ⚠️ 26-10-02 다시 고침 — 「영수증 분석기가 너무 느림 · 드라이브엔 금방 들어가는데 웹앱은 오래 걸리고 실패처럼 뜸」
+   한 장마다  ① 전에 올렸나 묻기(2~5초) → ② 올리기(4~8초) → ③ 3초 쉬고 되묻기  를 **한 장씩 차례로** 했습니다.
+   → ① 은 사진을 고를 때 미리 묻습니다 (미리확인)
+   → ② 는 두 장씩 같이 올립니다. 서버가 잠금을 걸어 같은 사진 두 번 저장은 막습니다
+   → ③ 은 기다리지 않고 바로 묻습니다. 올리기가 끝났다는 건 서버 일이 끝났다는 뜻입니다 (no-cors 도 답이 올 때까지 기다림)
+   → 끝까지 안 보여도 「안 들어갔습니다」라고 하지 않습니다. 「확인 중」으로 두고 30초 · 1분 · 2분 뒤에 다시 봅니다
+      ⚠️ 거짓 실패를 보면 사람이 또 올립니다 (문자 6통 사고와 같은 병) */
+const 되묻기간격 = [0, 3000, 6000, 10000];
+async function 미리확인(q){
+  try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
+  if(q.status!=='대기' && q.status!=='준비중') return;
+  const before = await API.photoExists(q.hash);
+  if(before && (q.status==='대기'||q.status==='준비중')){ q.status='이미있음'; q.err='전에 올린 사진입니다'+(before.시각?` (${before.시각})`:''); q.b64=null; if(cur==='t-rcpt') rerender(); }
+}
+async function 한장(q){
+  q.status='업로드중'; rerender();
+  try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
+  try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷 연결을 확인하고 다시 시도하세요'; rerender(); return; }
+  if(!q.hash){ q.status='완료'; q.b64=null; rerender(); return; }
+  let got;
+  for(const ms of (API.RECEIPT_LIVE?되묻기간격:[300])){
+    if(ms) await wait(ms);
+    got = await API.photoExists(q.hash);
+    if(got) break;
   }
+  q.b64=null;
+  if(got){ q.status='완료'; q.err=''; }
+  else { q.status='확인중'; q.err='올라가는 중입니다. 다시 올리지 마세요 — 잠시 뒤 저절로 확인합니다'; 나중확인(q,0); }
+  rerender();
+}
+function 나중확인(q,n){
+  const 간격=[30000,60000,120000];
+  if(n>=간격.length){ q.status='확인못함'; q.err='확인을 못 했습니다. 드라이브에 있으면 된 것입니다. 다시 올려도 중복되지 않습니다'; if(cur==='t-rcpt') rerender(); return; }
+  setTimeout(async()=>{ const got=await API.photoExists(q.hash);
+    if(got){ q.status='완료'; q.err=''; if(cur==='t-rcpt') rerender(); toast('영수증 올라간 것 확인했습니다'); }
+    else 나중확인(q,n+1); }, 간격[n]);
+}
+async function runQueue(){
+  if(R.running) return;
+  R.running=true; rerender();
+  const 할것=()=>R.queue.find(q=>q.status==='대기'&&q.b64);
+  const 일꾼=async()=>{ let q; while((q=할것())) await 한장(q); };
+  await Promise.all([일꾼(),일꾼()]);   // 두 장씩
   R.running=false; rerender();
   const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`영수증 ${n}장 올림. 새벽에 자동 분석됩니다`);
 }
@@ -990,7 +1073,11 @@ document.addEventListener('click', async e=>{
 
     /* 오늘 · 오픈 */
     case 'openck': { const id=b.dataset.id; S.close.openChecks[id]=!S.close.openChecks[id]; save(); rerender(); queueCheck('open', id.startsWith('cy_')?id.slice(3):id, !!S.close.openChecks[id]); break; }
-    case 'opendone': if(b.disabled) break; b.disabled=true; flushChecks(); await API.post(STORE.closeGas,{action:'completeOpen',date:BD_KEY,carried:(Y?Y.carry:[]).map(c=>c.label).join(', ')}); S.close.openDone=hhmm()+' 완료'; save(); rerender(); toast('오픈 완료'); break;
+    case 'opendone': { if(b.disabled||S.close.openDone) break; b.disabled=true; flushChecks();   // 화면 먼저, 보내기는 뒤에서 (26-10-02)
+      const carried=(Y?Y.carry:[]).map(c=>c.label).join(', ');
+      S.close.openDone=hhmm()+' 완료'; save(); rerender(); toast('오픈 완료');
+      API.post(STORE.closeGas,{action:'completeOpen',date:BD_KEY,carried}).catch(()=>toast('⚠️ 인터넷이 끊겨 오픈 기록이 못 갔을 수 있습니다'));
+      break; }
 
     /* 고기 */
     case 'meatmode': S.meat.mode=b.dataset.v; save(); rerender(); break;
@@ -1015,7 +1102,7 @@ document.addEventListener('click', async e=>{
       break; }
 
     /* 식자재 */
-    case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
+    case 'sup': S.food.sup=b.dataset.v; save(); rerender(); 업체보이기(); break;
     case 'ft': { const c=S.food.cart[b.dataset.k]||{on:false,qty:''}; c.on=!c.on; if(!c.on) c.qty=''; S.food.cart[b.dataset.k]=c; save(); rerender(); queueCart(b.dataset.k); break; }
     case 'fq': { const c=S.food.cart[b.dataset.k]||{on:false,qty:0}; c.qty=Math.max(0,(c.on?(+c.qty||0):0)+ +b.dataset.d); c.on=c.qty>0; S.food.cart[b.dataset.k]=c; save(); rerender(); queueCart(b.dataset.k); break; }
     case 'foodpreview': { const J=주류Msgs(); if(J.sum>0&&J.sum<3){ toast(`🍶 주류는 합쳐서 3개부터 주문됩니다 (지금 ${J.sum}개)`); break; } const L=foodLines();
@@ -1039,7 +1126,8 @@ document.addEventListener('click', async e=>{
 
     /* 마감 */
     case 'closemode': S.close.mode=b.dataset.v; save(); rerender(); break;
-    case 'ck': { const id=b.dataset.id; S.close.checks[id]=!S.close.checks[id]; if(S.close.checks[id]) delete S.close.carry[id]; save(); rerender(); queueCheck('close',id,!!S.close.checks[id]); break; }
+    case 'closesub': S.close.sub=b.dataset.v; save(); rerender(); window.scrollTo(0,0); break;
+    case 'ck': { const id=b.dataset.id; S.close.checks[id]=!S.close.checks[id]; if(S.close.checks[id]) delete S.close.carry[id]; { const g=묶음키(id); if(g && g.items.every(([x])=>S.close.checks[x]||S.close.carry[x])) 펼친묶음.delete(g.key); } save(); rerender(); queueCheck('close',id,!!S.close.checks[id]); break; }
     case 'carry': { const id=b.dataset.id; S.close.carry[id]=!S.close.carry[id]; if(S.close.carry[id]) S.close.checks[id]=false; save(); rerender(); break; }
     case 'tocart': { const id=b.dataset.id, rows=발주표[id];
       if(S.food.srcs[id]){ cartRemove(id,rows); break; }
@@ -1080,11 +1168,16 @@ document.addEventListener('change', async e=>{
   if(e.target.dataset.act!=='rcpt') return;
   R.doc = e.target.dataset.v;
   const files=[...e.target.files]; e.target.value='';
-  for(const f of files){
-    const hash=fingerprint(f);   // ⚠️ 압축 전 원본으로, 기다리지 않고 약속을 담아 둡니다
-    try{ const {b64,thumb}=await shrink(f); R.queue.push({docType:R.doc,fname:f.name,b64,thumb,hash,status:'대기'}); }
-    catch(err){ toast('사진을 읽지 못했습니다: '+f.name); }
-    rerender();
+  /* ⚠️ 26-10-02 「사진 찍고 바로바로 안 뜸 · 올릴 목록이 뜰 때 있고 안 뜰 때 있음」
+     전에는 사진을 다 줄인 뒤에야 목록에 넣었습니다. 큰 사진은 줄이는 데 1~3초 → 그동안 아무것도 안 보임.
+     → 먼저 「준비 중」으로 목록에 넣고, 줄이기는 뒤에서 하나씩. 지문·「전에 올렸나」도 이때 미리 물어 둡니다 */
+  const 새것 = files.map(f=>({docType:R.doc,fname:f.name,file:f,b64:null,thumb:'',hash:fingerprint(f),status:'준비중'}));
+  R.queue.push(...새것); rerender();
+  for(const q of 새것){
+    try{ const {b64,thumb}=await shrink(q.file); q.b64=b64; q.thumb=thumb; if(q.status==='준비중') q.status='대기'; }
+    catch(err){ q.status='오류'; q.err='사진을 읽지 못했습니다. 다시 찍어 주세요'; }
+    q.file=null; if(cur==='t-rcpt') rerender();
+    미리확인(q);
   }
 });
 document.addEventListener('input', e=>{
