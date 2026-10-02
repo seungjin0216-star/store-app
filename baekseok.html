@@ -226,7 +226,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-02-v6';
+const APP_VERSION = '2026-10-02-v7';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -562,6 +562,16 @@ function rToday(){
   `;
 }
 
+/* ══════════════ 🔴 두 번 눌러도 한 번만 (26-10-02) ══════════════
+   사장님: 「일단 엄청느림 그니까 눌렀는지 몰라서 한번 더클릭 … 누르는만큼 다 기록됨」
+   원인: 서버(GAS)가 답할 때까지 3~6초 기다리는 동안 버튼이 살아 있었음 → 누른 만큼 기록
+         가게카드 8/27 ×3 · 9/28 ×2 · 10/1 고기 입고 ×4 가 이렇게 들어갔습니다
+   → ① 누르는 순간 화면을 끝내고(폼 비움·창 닫음) 보내기는 뒤에서 — 답을 안 기다립니다 (no-cors 라 어차피 못 들음)
+     ② 같은 내용을 3분 안에 또 보내면 한 번 더 묻습니다 */
+const recentSame = (sig) => { try{ const o=JSON.parse(localStorage.getItem('store-last-send')||'{}'); return o[sig] && Date.now()-o[sig] < 3*60e3; }catch(e){ return false; } };
+const markSent = (sig) => { try{ const o=JSON.parse(localStorage.getItem('store-last-send')||'{}'); Object.keys(o).forEach(k=>{ if(Date.now()-o[k]>10*60e3) delete o[k]; }); o[sig]=Date.now(); localStorage.setItem('store-last-send',JSON.stringify(o)); }catch(e){} };
+let closing=false;
+
 /* ══════════════ 🔔 폰 알림 (26-10-02) ══════════════
    사장님: 「고기입고알림 (16시) , 식자재발주 (22시) , 어제보낸 발주,챙겨올것 (13시30분) , 마감체크 완료」
    ⚠️ 아이폰은 홈 화면에 추가한 앱에서만 알림이 됩니다 (애플 규칙)
@@ -788,6 +798,8 @@ function sheetShort(){
     <button class="link-btn" data-act="cashback">다시 고르기</button>`);
 }
 async function finishClose(cash){
+  if(closing) return; closing=true;     // 시재 버튼을 두 번 눌러도 한 번만
+  document.querySelectorAll('#sheet button').forEach(x=>x.disabled=true);
   const carried=Object.keys(S.close.carry).filter(k=>S.close.carry[k]).map(k=>LABEL[k]);
   flushChecks();
   if(cash>0) await API.post(STORE.closeGas,{action:'cash',date:BD_KEY,short:cash,device:DEVICE,branch:STORE.branch});
@@ -795,6 +807,7 @@ async function finishClose(cash){
   if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
   S.close.done=hhmm(); S.close.cash=cash==null?null:cash; save(); closeSheet(); rerender();
   toast(carried.length?`마감 완료. 내일 오픈으로 ${carried.length}개 넘김`:'마감 완료');
+  closing=false;
   // 🔔 사장님 (26-10-02): 「마감체크가 완료되었을때 알림이 울리게끔」 → 사장앱 + 다른 직원 폰 (누른 폰은 빼고)
   //    ⚠️ 답장을 안 기다립니다 (no-cors). 알림이 안 가도 마감은 이미 끝났습니다
   if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length})}).catch(()=>{});
@@ -977,7 +990,7 @@ document.addEventListener('click', async e=>{
 
     /* 오늘 · 오픈 */
     case 'openck': { const id=b.dataset.id; S.close.openChecks[id]=!S.close.openChecks[id]; save(); rerender(); queueCheck('open', id.startsWith('cy_')?id.slice(3):id, !!S.close.openChecks[id]); break; }
-    case 'opendone': flushChecks(); await API.post(STORE.closeGas,{action:'completeOpen',date:BD_KEY,carried:(Y?Y.carry:[]).map(c=>c.label).join(', ')}); S.close.openDone=hhmm()+' 완료'; save(); rerender(); toast('오픈 완료'); break;
+    case 'opendone': if(b.disabled) break; b.disabled=true; flushChecks(); await API.post(STORE.closeGas,{action:'completeOpen',date:BD_KEY,carried:(Y?Y.carry:[]).map(c=>c.label).join(', ')}); S.close.openDone=hhmm()+' 완료'; save(); rerender(); toast('오픈 완료'); break;
 
     /* 고기 */
     case 'meatmode': S.meat.mode=b.dataset.v; save(); rerender(); break;
@@ -987,10 +1000,17 @@ document.addEventListener('click', async e=>{
       if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
       const 정정 = S.meat.sent[k];
       openSheet(`<h2>${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 ${k==='order'?'발주':'입고'}가 있습니다</b><span>이걸 보내면 「⚠️ 정정 — 앞서 보낸 것 대신 이것」으로 갑니다${k==='recv'?'. 고기값도 이것으로만 잡힙니다':''}</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}">${k==='order'?'발주':'입고'} 보내기</button><button class="link-btn" data-act="close">고치기</button>`); break; }
-    case 'sendmeatok': { const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
-      await API.post(STORE.orderGas, k==='order'
+    case 'sendmeatok': { if(b.disabled) break; b.disabled=true;
+      const k=b.dataset.v, o=S.meat.order, r=S.meat.recv, n=v=>+v||0;
+      const body = k==='order'
         ? {type:'order',branch:STORE.meatBranch,gc_use:n(o.use),gc_done:n(o.done),gc_ing:n(o.ing),dc:n(o.dc),mc:o.mcMax?0:n(o.mc),mc_max:!!o.mcMax,extras:o.extras,date:realDateStr(),monday_delay:new Date().getDay()===1}
-        : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()}); S.meat.sent[k]=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄'); break; }
+        : {type:'stock',branch:STORE.meatBranch,gc:n(r.gc),dc:n(r.dc),mc:n(r.mc),bs:n(r.box),extras:r.extras,date:realDateStr()};
+      const sig = 'meat:'+JSON.stringify(body);
+      if(recentSame(sig) && !confirm('방금 같은 내용을 보냈습니다. 정말 또 보낼까요?')){ closeSheet(); break; }
+      markSent(sig);
+      S.meat.sent[k]=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rerender(); toast(k==='order'?'고기 발주 보냄':'입고 보냄');
+      API.post(STORE.orderGas, body).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다. 20초 뒤 상태를 보세요'));
+      break; }
 
     /* 식자재 */
     case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
@@ -1039,8 +1059,13 @@ document.addEventListener('click', async e=>{
     case 'rdel': R.queue.splice(+b.dataset.i,1); rerender(); break;
     case 'rsubmit': runQueue(); break;
     case 'rdir': R.dir=b.dataset.v; R.memo=''; rerender(); break;
-    case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)) break;
-      await API.direct(R.dir,amt,R.date,R.memo); toast(`기록함 · ${R.dir} ${won(amt)}`); R.dir='';R.amt='';R.memo=''; rerender(); break; }
+    case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)||b.disabled) break; b.disabled=true;
+      const dir=R.dir, date=R.date, memo=R.memo, sig='direct:'+[dir,amt,date,memo].join('|');
+      if(recentSame(sig) && !confirm(`방금 ${dir} ${won(amt)}을 기록했습니다. 정말 또 기록할까요?`)){ b.disabled=false; break; }
+      markSent(sig);
+      R.dir='';R.amt='';R.memo=''; rerender(); toast(`기록함 · ${dir} ${won(amt)}`);   // 화면 먼저
+      API.direct(dir,amt,date,memo).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다'));
+      break; }
 
     case 'guide': { const id=b.dataset.id; openSheet(`<h2>${esc(LABEL[id]||id)}</h2>${기준그리기(기준표&&기준표[id])}<button class="big-btn sec" data-act="close">닫기</button>`); break; }
 
