@@ -234,7 +234,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-02-v9';
+const APP_VERSION = '2026-10-03-v10';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -248,6 +248,7 @@ const STORE = {
         → 숫자를 바꿀 때는 아래 발주표 gr2 의 수량도 같이 보십시오. */
   daepaKimchiOver: 4,
   noMeatOrderDays: [2],         // 고기 발주 없는 요일 (0=일 … 6=토)
+  noMeatInDays: [0, 2],         // 고기 안 들어오는 요일 — 일·화 (사장님 26-10-03 「업체 쉬는 날」)
   shiftHour: 16,                // 이 시각 전: 오픈·입고 화면 / 이후: 마감·발주 화면
   branch: 'baekseok',            // 마감·식자재 서버가 쓰는 이름
   meatBranch: 'baeseok',         // ⚠️ 고기 서버는 예전부터 이 철자입니다. 바꾸지 마세요
@@ -501,7 +502,7 @@ const RENDER = {'t-today':rToday,'t-meat':rMeat,'t-food':rFood,'t-close':rClose,
 let cur = 't-today';
 function autoMode(id){
   const h=new Date().getHours(), early = h>=8 && h<STORE.shiftHour;
-  if(id==='t-meat') S.meat.mode = early?'recv':'order';
+  if(id==='t-meat') S.meat.mode = early && !STORE.noMeatInDays.includes(WD) ? 'recv':'order';
   if(id==='t-close') S.close.mode = early?'open':'close';
 }
 function go(id,mode){
@@ -528,15 +529,17 @@ function rToday(){
   const daepaDay = Y.daepa!=null && Y.daepa >= STORE.daepaKimchiOver;
   const closedToday = WD===STORE.closedDay;
   const noMeat = STORE.noMeatOrderDays.includes(WD);
+  const noMeatIn = STORE.noMeatInDays.includes(WD);
   const todayRows = [
     Y.meatIn==null ? null : Y.meatIn.length ? ['🥩','오늘 들어오는 고기', Y.meatIn.join(', ')] : ['🥩','오늘 들어오는 고기 없음',''],
     daepaDay ? ['🥬','대파김치 하는 날', `어제 대파 ${Y.daepa}단 주문`] : null,
     noMeat ? ['🚫','고기 발주 없는 날', ''] : null,
+    noMeatIn ? ['🚚','고기 입고 없는 날', '일·화는 업체가 쉽니다'] : null,
     closedToday ? ['💤','휴무일', '발주는 저장만 되고 저녁에 자동 발송'] : null,
   ].filter(Boolean);
   const task = (dot,label,sub,tag,cls,goto,mode='')=>`<button class="row" data-tab="${goto}" data-mode="${mode}"><span class="dot ${dot}"></span><span class="main">${label}<span class="sub">${sub}</span></span><span class="tag ${cls}">${tag}</span></button>`;
   const mt = S.meat.sent;
-  el.innerHTML = notifyBanner() + `
+  el.innerHTML = notifyBanner() + 영수증실패띠() + `
     ${todayRows.length?`<div class="today">
       <div class="today-h">오늘은</div>
       ${todayRows.map(([em,t,sub])=>`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
@@ -545,7 +548,7 @@ function rToday(){
     <p class="hint">위에서부터 하면 됩니다.</p>
     <div class="list">
       ${task(S.close.openDone?'ok':'idle','오픈 체크', S.close.openDone?'완료':'출근하면 먼저', S.close.openDone?'완료':'대기', S.close.openDone?'ok':'wait','t-close','open')}
-      ${task(mt.recv?'ok':'idle','고기 입고 입력', mt.recv?mt.recv+' 보냄':'15:00까지', mt.recv?'완료':'대기', mt.recv?'ok':'wait','t-meat','recv')}
+      ${noMeatIn&&!mt.recv?'':task(mt.recv?'ok':'idle','고기 입고 입력', mt.recv?mt.recv+' 보냄':'15:00까지', mt.recv?'완료':'대기', mt.recv?'ok':'wait','t-meat','recv')}
       ${task(S.food.sent?'ok':'bad','식자재 발주', S.food.sent?S.food.sent+' 보냄':'미락 22:25 마감', S.food.sent?'완료':'남음', S.food.sent?'ok':'warn','t-food')}
       ${noMeat?'':task(mt.order?'ok':'bad','고기 발주', mt.order?mt.order+' 보냄':'22:00까지', mt.order?'완료':'남음', mt.order?'ok':'warn','t-meat','order')}
       ${task(S.close.done?'ok':'idle','마감 체크', S.close.done?'완료':'영업 끝나고', S.close.done?'완료':'저녁', S.close.done?'ok':'wait','t-close','close')}
@@ -641,6 +644,7 @@ function rMeat(){
       <button class="big-btn" data-act="sendmeat" data-v="order" ${m.sent.order?'style="background:var(--warm)"':''}>${m.sent.order?'✏️ 정정해서 보내기':'발주 보내기'}</button>`;
   } else {
     el.innerHTML = seg
+    + (STORE.noMeatInDays.includes(WD)&&!m.sent.recv?`<div class="banner red"><span class="em">🚚</span><div><b>오늘은 고기 입고 없는 날</b><span>일·화는 업체가 쉽니다. 입력하지 않아도 됩니다</span></div></div>`:'')
     + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
     + `<h2>오늘 들어온 양</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
       <div class="list">
@@ -949,12 +953,12 @@ const demoHashes = new Set();
 function rRcpt(){
   const qIcon=st=>({'준비중':'…','대기':'🕐','업로드중':'⏳','확인중':'🔄','완료':'✅','이미있음':'♻️','확인못함':'⚠️','오류':'❌'}[st]);
   const waiting=R.queue.filter(q=>q.status==='대기'&&q.b64).length, 준비=R.queue.filter(q=>q.status==='준비중').length;
-  $('#t-rcpt').innerHTML = `
+  $('#t-rcpt').innerHTML = 영수증실패띠() + `
     ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
     <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. 여러 장도 됩니다.</p>
     <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
-    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}</div>`).join('')}</div>
-      <button class="big-btn" data-act="rsubmit" ${waiting&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
+    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}${q.status==='오류'&&q.b64&&!R.running?`<button class="icon-btn" data-act="rretry" data-i="${i}">다시</button>`:''}</div>`).join('')}</div>
+      <button class="big-btn" data-act="rsubmit" ${(waiting||준비)&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
 
     <h2>② 금액만 적을 것</h2><p class="hint">영수증 없이 금액만 넣는 것들입니다.</p>
     <div class="doc-grid">${DIRECT_TYPES.map(([v,e,l,s])=>`<button class="doc" data-act="rdir" data-v="${v}" aria-pressed="${R.dir===v}"><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</button>`).join('')}</div>
@@ -970,7 +974,8 @@ async function fingerprint(file){
 async function shrink(file){
   if(window.createImageBitmap){
     try{
-      const bm=await createImageBitmap(file,{imageOrientation:'from-image'});
+      // ⚠️ 26-10-03 사진 줄이기가 끝나지 않고 멈춘 적이 있음 (화면이 뒤로 갔을 때) → 3초 넘으면 옛 방식으로
+      const bm=await Promise.race([createImageBitmap(file,{imageOrientation:'from-image'}), new Promise((_,no)=>setTimeout(()=>no(new Error('느림')),3000))]);
       let w=bm.width,h=bm.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
       const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(bm,0,0,w,h); bm.close&&bm.close();
       const url=c.toDataURL('image/jpeg',0.85); const t=document.createElement('canvas'); const sc=120/Math.max(w,h); t.width=w*sc;t.height=h*sc; t.getContext('2d').drawImage(c,0,0,t.width,t.height);
@@ -978,7 +983,7 @@ async function shrink(file){
       return {b64:url.split(',')[1], thumb:t.toDataURL('image/jpeg',0.7)};
     }catch(e){ /* 안 되면 아래 옛 방식 */ }
   }
-  return shrinkOld(file);
+  return Promise.race([shrinkOld(file), new Promise((_,no)=>setTimeout(()=>no(new Error('사진 읽기 시간 초과')),15000))]);
 }
 function shrinkOld(file){
   return new Promise((ok,no)=>{ const r=new FileReader(); r.onerror=no; r.onload=e=>{ const img=new Image(); img.onerror=no; img.onload=()=>{
@@ -1000,7 +1005,36 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    → ③ 은 기다리지 않고 바로 묻습니다. 올리기가 끝났다는 건 서버 일이 끝났다는 뜻입니다 (no-cors 도 답이 올 때까지 기다림)
    → 끝까지 안 보여도 「안 들어갔습니다」라고 하지 않습니다. 「확인 중」으로 두고 30초 · 1분 · 2분 뒤에 다시 봅니다
       ⚠️ 거짓 실패를 보면 사람이 또 올립니다 (문자 6통 사고와 같은 병) */
-const 되묻기간격 = [0, 3000, 6000, 10000];
+/* 🔴 26-10-03 사장님: 「너무 오래 걸려 · 드라이브에 안 올라가거나 실패한 적이 없는 것 같은데 무조건 완료 뜨게 하면?」
+   → 보내기가 끝나면 **바로 ✅**. 「들어갔나」 확인은 화면을 막지 않고 뒤에서 합니다.
+   ⚠️ 그래도 확인은 계속합니다 — 확인을 없애면 진짜 안 들어간 날 아무도 모르고 손익이 비게 됩니다 (조용한 실패)
+      확인 대기 목록은 폰에 저장(rcpt-pending) → 앱을 닫았다 열어도 이어서 확인
+      10분이 지나도 서버에 없으면 그때만 「⚠️ N장이 안 들어갔습니다」 띠를 띄움 (오늘·영수증 화면) */
+const PENDING='rcpt-pending-'+STORE.code, FAILED='rcpt-failed-'+STORE.code;
+const lsGet=(k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v.slice(-60))); }catch(e){} };
+let 확인중=false;
+async function 뒤확인(){
+  if(확인중||!API.RECEIPT_LIVE) return; 확인중=true;
+  try{
+    const now=Date.now(), keep=[], fail=lsGet(FAILED);
+    for(const p of lsGet(PENDING)){
+      if(now-p.at<20000){ keep.push(p); continue; }
+      const got=await API.photoExists(p.hash);
+      if(got) continue;                                    // 들어갔다
+      if(got===null && now-p.at>10*60e3){ fail.push(p); continue; }   // 10분이 지나도 없음 → 실패로
+      if(now-p.at<24*3600e3) keep.push(p);                 // 못 물어봤으면 계속 (하루까지)
+    }
+    lsSet(PENDING,keep); const 새실패=fail.length!==lsGet(FAILED).length; lsSet(FAILED,fail);
+    if(새실패) rerender();
+  }finally{ 확인중=false; }
+}
+function 영수증실패띠(){
+  const f=lsGet(FAILED); if(!f.length) return '';
+  return `<div class="banner red"><span class="em">⚠️</span><div><b>영수증 ${f.length}장이 안 들어갔습니다</b><span>${f.slice(-3).map(x=>esc(x.when+' '+x.label)).join(' · ')} — 사진첩에서 다시 올려 주세요 (다시 올려도 중복 안 됨)</span></div><button class="icon-btn" data-act="rfailok" aria-label="확인">확인</button></div>`;
+}
+/* 「전에 올린 사진인가」 — 사진을 고를 때 미리 물어 둡니다 (보낼 때 기다리지 않게)
+   ⚠️ 26-10-03 영수증 고치다 이 함수를 같이 지워 사진이 「준비 중」에서 멈춤 — 지우지 말 것 */
 async function 미리확인(q){
   try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
   if(q.status!=='대기' && q.status!=='준비중') return;
@@ -1010,34 +1044,21 @@ async function 미리확인(q){
 async function 한장(q){
   q.status='업로드중'; rerender();
   try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
-  try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷 연결을 확인하고 다시 시도하세요'; rerender(); return; }
-  if(!q.hash){ q.status='완료'; q.b64=null; rerender(); return; }
-  let got;
-  for(const ms of (API.RECEIPT_LIVE?되묻기간격:[300])){
-    if(ms) await wait(ms);
-    got = await API.photoExists(q.hash);
-    if(got) break;
-  }
-  q.b64=null;
-  if(got){ q.status='완료'; q.err=''; }
-  else { q.status='확인중'; q.err='올라가는 중입니다. 다시 올리지 마세요 — 잠시 뒤 저절로 확인합니다'; 나중확인(q,0); }
-  rerender();
-}
-function 나중확인(q,n){
-  const 간격=[30000,60000,120000];
-  if(n>=간격.length){ q.status='확인못함'; q.err='확인을 못 했습니다. 드라이브에 있으면 된 것입니다. 다시 올려도 중복되지 않습니다'; if(cur==='t-rcpt') rerender(); return; }
-  setTimeout(async()=>{ const got=await API.photoExists(q.hash);
-    if(got){ q.status='완료'; q.err=''; if(cur==='t-rcpt') rerender(); toast('영수증 올라간 것 확인했습니다'); }
-    else 나중확인(q,n+1); }, 간격[n]);
+  try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷이 끊겼습니다 — 「다시」를 눌러 주세요'; rerender(); return; }
+  q.status='완료'; q.err=''; q.b64=null; rerender();          // ✅ 바로
+  if(q.hash){ const l=lsGet(PENDING); l.push({hash:q.hash, at:Date.now(), when:hhmm(), label:(DOC_TYPES.find(d=>d[0]===q.docType)||['','',''])[2]}); lsSet(PENDING,l); }
 }
 async function runQueue(){
+  R.autoSend = true;   // 아직 준비 중인 사진도 준비되면 바로 보냄
   if(R.running) return;
   R.running=true; rerender();
   const 할것=()=>R.queue.find(q=>q.status==='대기'&&q.b64);
   const 일꾼=async()=>{ let q; while((q=할것())) await 한장(q); };
   await Promise.all([일꾼(),일꾼()]);   // 두 장씩
   R.running=false; rerender();
-  const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`영수증 ${n}장 올림. 새벽에 자동 분석됩니다`);
+  const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`✅ 영수증 ${n}장 보냄. 새벽에 자동 분석됩니다`);
+  if(!R.queue.some(q=>q.status==='준비중')) R.autoSend=false;
+  setTimeout(뒤확인,25000);
 }
 
 /* ══════════════ 숫자판 / 아래 판 ══════════════ */
@@ -1147,6 +1168,8 @@ document.addEventListener('click', async e=>{
 
     /* 영수증 */
     case 'rdel': R.queue.splice(+b.dataset.i,1); rerender(); break;
+    case 'rretry': { const q=R.queue[+b.dataset.i]; if(q){ q.status='대기'; q.err=''; } runQueue(); break; }
+    case 'rfailok': lsSet(FAILED,[]); rerender(); break;
     case 'rsubmit': runQueue(); break;
     case 'rdir': R.dir=b.dataset.v; R.memo=''; rerender(); break;
     case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)||b.disabled) break; b.disabled=true;
@@ -1178,6 +1201,7 @@ document.addEventListener('change', async e=>{
     catch(err){ q.status='오류'; q.err='사진을 읽지 못했습니다. 다시 찍어 주세요'; }
     q.file=null; if(cur==='t-rcpt') rerender();
     미리확인(q);
+    if(R.autoSend && q.status==='대기') runQueue();   // 「모두 제출」을 이미 눌렀으면 준비되는 대로 보냄
   }
 });
 document.addEventListener('input', e=>{
@@ -1214,7 +1238,8 @@ if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
 go('t-today');
 API.yesterday().then(d=>{ Y=d; window.Y=d; rerender(); });
 if(LIVE){
-  readCart(true); loadMonthly(); load기준표(); readMeat(); setTimeout(새버전확인,5000);
+  readCart(true); loadMonthly(); load기준표(); readMeat(); setTimeout(새버전확인,5000); setTimeout(뒤확인,8000);
+  setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
   setInterval(()=>{ if(document.visibilityState==='visible') 새버전확인(); },10*60000);
   setInterval(()=>{ if(document.visibilityState==='visible') readCart(); },15000);
   setInterval(()=>{ if(document.visibilityState==='visible' && (cur==='t-today'||cur==='t-meat')) readMeat(); },20000);
