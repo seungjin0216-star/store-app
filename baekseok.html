@@ -234,7 +234,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-07-v14';
+const APP_VERSION = '2026-10-09-v16';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -735,6 +735,7 @@ function rFood(){
   const 옆자리 = (el.querySelector('.supbar')||{}).scrollLeft||0;
   el.innerHTML = `
     <button class="link-btn" data-act="holOpen" style="text-align:right;padding:4px 2px 10px;font-size:14px">📅 업체·가게 휴무 넣기</button>
+    ${휴무줄()}
     ${monTue?`<div class="banner warn"><span class="em">⚠️</span><div><b>월·화 발주 — 화요일 저녁 자동 발송</b><span>화요일 20:30에 업체로 나가고 수요일 납품. 월요일 14시 전 발주는 바로 나갑니다</span></div></div>`:''}
     ${나간업체.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 넣은 발주</b><span>${나간업체.map(k=>`${supOf(k).emoji} ${k} ${sentOf(k)}`).join(' · ')}</span></div></div>`:''}
     ${f.sent?`<div class="banner green"><span class="em">✅</span><div><b>${String(f.sent).includes('예약')?f.sent+' — 이 폰에서 넣음':f.sent+' 이 폰에서 보냄'}</b><span>더 담아서 또 보내도 됩니다</span></div></div>`:''}
@@ -874,6 +875,11 @@ function sheetShort(){
     <button class="big-btn" style="background:var(--beef)" data-act="cashsend" ${sum?'':'disabled'}>사장님께 알리고 완료</button>
     <button class="link-btn" data-act="cashback">다시 고르기</button>`);
 }
+/* ↪ 「내일로」는 누르는 순간 서버에 (26-10-09)
+   사장님: 「중간에 내일로 미룸을 체크하고 꺼버리면 이게 가지 않는 경우가 있는 것 같음」
+   → 맞았습니다. 전에는 시재까지 끝낸 폰의 것만 완료 때 보냈습니다. 다른 폰 것은 그 폰 안에서 사라졌습니다
+   ⚠️ 마감 체크는 일부러 폰마다 따로입니다 (26-09-22). 「내일로」만 서버에서 합칩니다 — 내일 오픈은 하나니까 */
+function 내일로보내기(id,on){ API.post(STORE.closeGas,{action:'carrySet',fromDate:BD_KEY,targetDate:nextDayKey(),id,label:LABEL[id]||id,group:(묶음키(id)||{}).key||'',on,device:DEVICE,branch:STORE.branch}); }
 async function finishClose(cash){
   if(closing) return; closing=true;     // 시재 버튼을 두 번 눌러도 한 번만
   document.querySelectorAll('#sheet button').forEach(x=>x.disabled=true);
@@ -1105,21 +1111,28 @@ async function runQueue(){
 
 /* ══════════════ 숫자판 / 아래 판 ══════════════ */
 let 데모휴무=[{from:'2026-10-12',to:'2026-10-12',target:'미락'}];
-async function 휴무창(){
+/* ⚠️ 26-10-09 사장님: 「업체휴무일은 넣지만 확인이 불가능해. 정리해야함」
+   ① 넣고 2.5초 뒤 다시 읽었는데 서버가 아직 저장 전이라 목록에 안 보였음 → 넣자마자 목록에 먼저 넣고, 4초·10초 뒤 서버와 맞춤
+   ② 취소한 것이 「미락_취소」로 그대로 보였음 (서버 목록이 안 거름 — 발주 GAS 에서 고침)
+   ③ 창을 열어야만 보였음 → 식자재 탭 버튼 아래에 잡힌 휴무를 늘 한 줄로 */
+let HOL=null;   // 서버의 임시휴무 목록 (null = 아직 모름)
+async function 휴무읽기(){ const r = LIVE ? await API.jsonp(STORE.orderGas,{action:'holidays'}) : {items:데모휴무}; if(r&&r.items){ HOL=r.items.filter(h=>!String(h.target).includes('_취소')); rerender(); if($('#hWho')) 휴무창(true); } return HOL; }
+function 휴무줄(){ if(!HOL||!HOL.length) return ''; return `<p class="hint holline" data-act="holOpen" style="margin:-4px 2px 10px;cursor:pointer">📅 잡힌 휴무 · ${HOL.map(h=>`<b>${h.target==='전체'?'가게':esc(h.target)}</b> ${h.from===h.to?날글(h.from):날글(h.from)+'~'+날글(h.to)}${h.pending?' (저장 중)':''}`).join(' · ')}</p>`; }
+async function 휴무창(다시그리기만){
   const 대상들=['전체',...SUPS.map(s=>s.key).filter(k=>k!=='주류')];
   const 그리기=list=>`<h2>📅 업체·가게 휴무</h2>
     <p class="hint">정기 휴무는 이미 들어가 있습니다 — <b>가게 화요일 · 미락 일요일</b></p>
     <p class="hint">쉬는 날이 있으면 발주는 <b>다시 받는 날 전날 20:30</b>에 저절로 나갑니다. 5일 전부터 오늘 화면에 뜹니다.</p>
     <h2 style="margin-top:14px">잡혀 있는 임시 휴무</h2>
-    ${list==null?'<p class="hint">불러오는 중…</p>':list.length?`<div class="list">${list.map(h=>`<div class="row"><span class="main"><b>${h.target==='전체'?'🏠 가게':esc(h.target)}</b><span class="sub">${h.from===h.to?날글(h.from):날글(h.from)+' ~ '+날글(h.to)}</span></span><button class="link-btn" style="width:auto;padding:8px" data-act="holDel" data-f="${h.from}" data-t="${esc(h.target)}">취소</button></div>`).join('')}</div>`:'<p class="hint">없음</p>'}
+    ${list==null?'<p class="hint">불러오는 중…</p>':list.length?`<div class="list">${[...list].sort((a,b)=>a.from<b.from?-1:1).map(h=>`<div class="row"><span class="main"><b>${h.target==='전체'?'🏠 가게':esc(h.target)}</b><span class="sub">${h.from===h.to?날글(h.from):날글(h.from)+' ~ '+날글(h.to)}${h.reason?' · '+esc(h.reason):''}${h.pending?' · ⏳ 저장 중':''}</span></span><button class="link-btn" style="width:auto;padding:8px" data-act="holDel" data-f="${h.from}" data-t="${esc(h.target)}">취소</button></div>`).join('')}</div>`:'<p class="hint">없음</p>'}
     <h2 style="margin-top:14px">새로 넣기</h2>
     <select class="field" id="hWho">${대상들.map(k=>`<option value="${k}">${k==='전체'?'🏠 가게 (우리가 쉼)':(supOf(k)?supOf(k).emoji+' ':'')+k}</option>`).join('')}</select>
     <div class="fields" style="display:flex;gap:8px;margin-top:8px"><label style="flex:1;font-size:13px;color:var(--muted)">쉬는 첫날<input class="field" id="hFrom" type="date" min="${BD_KEY}"></label><label style="flex:1;font-size:13px;color:var(--muted)">마지막 날 (하루면 비움)<input class="field" id="hTo" type="date" min="${BD_KEY}"></label></div>
     <input class="field" id="hWhy" placeholder="사유 (선택) 예: 업체 사정" style="margin-top:8px">
     <button class="big-btn" data-act="holAdd">휴무 넣기</button><button class="link-btn" data-act="close">닫기</button>`;
-  openSheet(그리기(null));
-  const r = LIVE ? await API.jsonp(STORE.orderGas,{action:'holidays'}) : {items:데모휴무};
-  if($('#hWho')) { const keep=[$('#hWho').value,$('#hFrom').value,$('#hTo').value,$('#hWhy').value]; $('#sheet').innerHTML=그리기((r&&r.items)||[]); [$('#hWho').value,$('#hFrom').value,$('#hTo').value,$('#hWhy').value]=keep; }
+  if(다시그리기만){ if(!$('#hWho')) return; const keep=[$('#hWho').value,$('#hFrom').value,$('#hTo').value,$('#hWhy').value]; $('#sheet').innerHTML=그리기(HOL); [$('#hWho').value,$('#hFrom').value,$('#hTo').value,$('#hWhy').value]=keep; return; }
+  openSheet(그리기(HOL));
+  휴무읽기();
 }
 function openSheet(html){ $('#sheet').innerHTML=html; $('#ov').classList.add('show'); }
 function closeSheet(){ $('#ov').classList.remove('show'); }
@@ -1207,8 +1220,8 @@ document.addEventListener('click', async e=>{
     /* 마감 */
     case 'closemode': S.close.mode=b.dataset.v; save(); rerender(); break;
     case 'closesub': S.close.sub=b.dataset.v; save(); rerender(); window.scrollTo(0,0); break;
-    case 'ck': { const id=b.dataset.id; S.close.checks[id]=!S.close.checks[id]; if(S.close.checks[id]) delete S.close.carry[id]; { const g=묶음키(id); if(g && g.items.every(([x])=>S.close.checks[x]||S.close.carry[x])) 펼친묶음.delete(g.key); } save(); rerender(); queueCheck('close',id,!!S.close.checks[id]); break; }
-    case 'carry': { const id=b.dataset.id; S.close.carry[id]=!S.close.carry[id]; if(S.close.carry[id]) S.close.checks[id]=false; save(); rerender(); break; }
+    case 'ck': { const id=b.dataset.id; S.close.checks[id]=!S.close.checks[id]; if(S.close.checks[id] && S.close.carry[id]){ delete S.close.carry[id]; 내일로보내기(id,false); } { const g=묶음키(id); if(g && g.items.every(([x])=>S.close.checks[x]||S.close.carry[x])) 펼친묶음.delete(g.key); } save(); rerender(); queueCheck('close',id,!!S.close.checks[id]); break; }
+    case 'carry': { const id=b.dataset.id; S.close.carry[id]=!S.close.carry[id]; if(S.close.carry[id]) S.close.checks[id]=false; save(); rerender(); 내일로보내기(id,!!S.close.carry[id]); break; }
     case 'tocart': { const id=b.dataset.id, rows=발주표[id];
       if(S.food.srcs[id]){ cartRemove(id,rows); break; }
       if(rows.length===1){ cartAdd(id,rows); break; }
@@ -1249,12 +1262,14 @@ document.addEventListener('click', async e=>{
     case 'holAdd': { const from=$('#hFrom').value, to=$('#hTo').value||from, target=$('#hWho').value, reason=$('#hWhy').value.trim();
       if(!from) { toast('쉬는 날을 골라 주세요'); break; } if(to<from) { toast('끝나는 날이 시작보다 앞입니다'); break; }
       b.disabled=true; await API.post(STORE.orderGas,{type:'holiday_add',from,to,target,reason,device:DEVICE});
-      if(!LIVE) 데모휴무.push({from,to,target});
-      toast(`📅 ${target==='전체'?'가게':target} 휴무 넣었습니다`); setTimeout(휴무창,2500); break; }
+      if(!LIVE) 데모휴무.push({from,to,target,reason});
+      HOL=[...(HOL||[]),{from,to,target,reason,pending:true}]; ['#hFrom','#hTo','#hWhy'].forEach(q=>$(q).value=''); 휴무창(true); rerender();
+      toast(`📅 ${target==='전체'?'가게':target} ${날글(from)} 휴무 넣었습니다`); b.disabled=false; setTimeout(휴무읽기,4000); setTimeout(휴무읽기,10000); break; }
     case 'holDel': { if(!confirm(`${b.dataset.t==='전체'?'가게':b.dataset.t} ${날글(b.dataset.f)} 휴무를 취소할까요?`)) break;
       b.disabled=true; await API.post(STORE.orderGas,{type:'holiday_remove',from:b.dataset.f,target:b.dataset.t,device:DEVICE});
       if(!LIVE) 데모휴무=데모휴무.filter(h=>!(h.from===b.dataset.f&&h.target===b.dataset.t));
-      toast('취소했습니다'); setTimeout(휴무창,2500); break; }
+      HOL=(HOL||[]).filter(h=>!(h.from===b.dataset.f&&h.target===b.dataset.t)); 휴무창(true); rerender();
+      toast('취소했습니다'); setTimeout(휴무읽기,4000); break; }
   }
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSheet(); });
@@ -1300,10 +1315,22 @@ async function 새버전확인(){
     if(m && m[1]!==APP_VERSION) $('#newver').classList.add('show');
   }catch(e){}
 }
+/* ⚠️ 26-10-09 10/8 마감 폰(78mn)이 옛 판으로 마감 — 「넘어온 것」 이름이 또 빈칸
+   아이폰 홈 화면 앱은 며칠씩 안 꺼지고 그대로 돌아와서, 켤 때 한 번 하는 확인이 안 돌았습니다
+   → 화면에 다시 나타날 때마다 확인. 5분 넘게 가려져 있다 돌아왔고 새 판이면 보낼 것을 먼저 보내고 저절로 새로고침 */
+let 가려진때=0;
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='hidden'){ 가려진때=Date.now(); return; }
+  if(!LIVE) return;
+  const 오래=가려진때 && Date.now()-가려진때>5*60e3;
+  try{ const t=await (await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'})).text(); const m=t.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1]!==APP_VERSION){ if(오래 && !$('#ov').classList.contains('show')){ try{ flushChecks(); flushCart(); }catch(e){} setTimeout(()=>location.reload(),900); } else $('#newver').classList.add('show'); } }catch(e){}
+});
 $('#newver').addEventListener('click',()=>{ try{ flushChecks(); flushCart(); }catch(e){} $('#newver').textContent='새로고침 중…'; setTimeout(()=>location.reload(),900); });
 
 /* 🔴 캐시가 있으면 **그리기 전에** 넣습니다. 그래야 첫 화면부터 「오늘은」이 보입니다 */
 const 캐시된어제 = LIVE ? API.readCache() : null;
+setTimeout(휴무읽기,1500);   // 📅 잡힌 휴무 (식자재 탭 한 줄)
 if(캐시된어제){ Y=캐시된어제; window.Y=캐시된어제; }
 
 go('t-today');
