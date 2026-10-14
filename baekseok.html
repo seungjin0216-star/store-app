@@ -142,6 +142,9 @@ details.grp[style*="--gc"] summary{background:color-mix(in srgb,var(--gc) 17%,va
 details.grp[style*="--gc"][open] summary{background:color-mix(in srgb,var(--gc) 26%,var(--surface))}
 details.grp[style*="--gc"] .row{background:color-mix(in srgb,var(--gc) 5%,var(--surface));box-shadow:inset 6px 0 0 color-mix(in srgb,var(--gc) 45%,transparent)}
 /* 📅 고기 요일 칸 */
+.shake{animation:shk .45s}
+@keyframes shk{0%,100%{transform:none}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
+.dayrow.need{box-shadow:inset 0 0 0 2px var(--beef);background:color-mix(in srgb,var(--beef) 8%,var(--surface))}
 .dayrow{padding-top:6px;padding-bottom:10px;background:color-mix(in srgb,var(--warm) 6%,var(--surface))}
 .days{display:flex;gap:4px;flex:1;justify-content:flex-end}
 .days button{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;padding:0}
@@ -244,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-14-v17';
+const APP_VERSION = '2026-10-14-v18';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -1216,6 +1219,12 @@ document.addEventListener('click', async e=>{
     case 'chip': { const arr=get(b.dataset.path), v=b.dataset.v, i=arr.indexOf(v); i<0?arr.push(v):arr.splice(i,1); save(); rerender(); break; }
     case 'sendmeat': { const k=b.dataset.v, msg=meatMsg(k);
       if(k==='recv'){ const r=S.meat.recv; if(!(r.gc||r.dc||r.mc||r.box||r.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; } }
+      /* 📅 26-10-14 사장님: 「실수로 요일을 체크 안 할 수 있으니 … 발주 보내기 클릭 시 폰이 흔들리는 효과를 내주면서 『요일을 입력하세요』」 */
+      if(k==='order'){ const o=S.meat.order, 빈=['use','done','ing'].flatMap(x=>Array.from({length:요일수(o[x])},(_,i)=>((o.days||{})[x]||[])[i]?null:x+i)).filter(Boolean);
+        if(빈.length){ toast('📅 요일을 입력하세요'); try{ navigator.vibrate&&navigator.vibrate([80,50,80]); }catch(e){}
+          const el=$('#t-meat'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+          document.querySelectorAll('.dayrow').forEach((r,i)=>{ const 비었나=!r.querySelector('[aria-pressed="true"]'); r.classList.toggle('need',비었나); });
+          const 첫=document.querySelector('.dayrow.need'); if(첫) 첫.scrollIntoView({block:'center',behavior:'smooth'}); break; } }
       const 정정 = S.meat.sent[k];
       openSheet(`<h2>${정정?'✏️ 정정 — ':''}${k==='order'?'사장님·업체에 갈 문자':'사장님·업체에 갈 입고 알림'}</h2>${정정?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 ${k==='order'?'발주':'입고'}가 있습니다</b><span>이걸 보내면 「⚠️ 정정 — 앞서 보낸 것 대신 이것」으로 갑니다${k==='recv'?'. 고기값도 이것으로만 잡힙니다':''}</span></div></div>`:''}<div class="sentbox num">${esc(msg)}</div><button class="big-btn" data-act="sendmeatok" data-v="${k}" ${정정?'style="background:var(--warm)"':''}>${정정?'정정 보내기':(k==='order'?'발주 보내기':'입고 보내기')}</button><button class="link-btn" data-act="close">고치기</button>`); break; }
     case 'sendmeatok': { if(b.disabled) break; b.disabled=true;
