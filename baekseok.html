@@ -247,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-14-v18';
+const APP_VERSION = '2026-10-15-v19';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -270,7 +270,7 @@ const STORE = {
   closeGas: 'https://script.google.com/macros/s/AKfycbxeauYyGzxWMcPSrpHAidBAnYMuIZW3XqmGg1gTomZfuM7vdmfJl2y-VG1Hk72ohFhTZg/exec',
   orderGas: 'https://script.google.com/macros/s/AKfycbw97e3tDmVYUG4_cDiKQrkNuRhWAJFiUrMQuATAzfy0WEAZwhAPdMryzY-Oa8TGJe2-cg/exec',
   // ⚠️ 서버가 이 번호로 문자를 보냅니다 (서버 설정 번호가 한때 전부 사장님 번호였던 사고 이후 같이 보냄)
-  phones: {'미락':'01089421859','콩나물':'01062333466','원당':'01041216995','네이버':'01041216995','사장님':'01053226995','배달관련':'01041216995','주류':'01056079640','음료수':'01037982411'},
+  phones: {},   // 📞 26-10-15 번호는 발주 서버(스크립트 속성 PHONES_JSON)에만 — 서버가 앱 번호를 안 씀 (문서/20_보안_점검표.md 3-①②)
   receiptStore: '백석점',
   // 🔔 폰 알림을 보내는 곳 — 사장앱 서버 (26-10-02)
   pushApi: 'https://endearing-frangollo-dc109d.netlify.app/.netlify/functions/owner-api',
