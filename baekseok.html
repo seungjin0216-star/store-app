@@ -247,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-16-v21';
+const APP_VERSION = '2026-10-16-v23';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -833,7 +833,7 @@ function rClose(){
     return;
   }
   if(c.done){
-    el.innerHTML = seg + `<div class="banner green"><span class="em">✅</span><div><b>오늘 마감 완료</b><span>${c.done}${c.settle?` · 현금 ${won(c.settle.cash)} · 이체 ${won(c.settle.xfer)}`:''}${c.cash?` · 시재 ${c.cash>0?won(c.cash)+' 부족 알림':'맞음'}`:''}</span></div></div>`
+    el.innerHTML = seg + `<div class="banner green"><span class="em">✅</span><div><b>오늘 마감 완료</b><span>${c.done}${c.settle?(c.settle.money==='Y'?` · 남은 현금 ${won(c.settle.pile)} · 이체 ${c.settle.xfer==='Y'?'있음':'없음'}`:' · 받은 현금·이체 없음'):''}${c.cash?` · 시재 ${c.cash>0?won(c.cash)+' 부족 알림':'맞음'}`:''}</span></div></div>`
       + `<button class="big-btn sec" data-act="undo">완료 취소하기</button>`;
     return;
   }
@@ -884,39 +884,48 @@ function 묶음키(id){
   return null;
 }
 document.addEventListener('toggle', e=>{ const d=e.target; if(d.matches && d.matches('details.grp[data-g]')){ d.open?펼친묶음.add(d.dataset.g):펼친묶음.delete(d.dataset.g); } }, true);
-/* 💰 마감정산 (26-10-14) — 사장님: 「마감하고 나서 우리가 정산을 해야 해. 현금 매출이 얼마 나왔고,
-   계좌이체는 얼마 했으며, 현재 시재가 맞는지 안 맞는지 확인하게끔」
-   → 시재 고르기 전에 두 금액을 적습니다. 마감 GAS 「마감정산」 탭에 한 줄 (settle) */
-/* 26-10-16 사장님 「0원을 적게 하지 말고 『없음』을 체크하는 것을 두어 줘. 실수 없이 하게끔」
-   → 칸마다 「없음」 버튼 · 금액이나 없음 둘 중 하나는 꼭
-   ⚠️ 같은 날 「계좌이체에 낸 돈도 현금으로 찍음」 → 여기 적는 건 포스 숫자가 아니라 **실제로 받은 돈** (다음 날 아침 포스 현금매출과 비교) */
-let ST={cash:'',xfer:'',cashNone:false,xferNone:false};
-const 정산됨 = ()=> (ST.cash!==''||ST.cashNone) && (ST.xfer!==''||ST.xferNone);
-/* 돈통에 있어야 할 돈 = 시재 기준 10만 원 + 현금 매출 − 계좌이체
-   (계좌이체로 받은 돈은 포스에 현금처럼 잡혀도 돈통에는 없습니다) — ⚠️ 이체를 「현금을 통장에 넣은 것」으로 써도 같은 셈 */
-function 있어야할돈(){ const c=+ST.cash||0, x=+ST.xfer||0, e=STORE.cashBase+c;   // 26-10-16 받은 현금만 돈통에 · 이체는 통장
-  return `<span class="em">🧮</span><div><b>돈통에 있어야 할 돈 ${won(e)}</b><span class="num">시재 ${won(STORE.cashBase)} + 받은 현금 ${won(c)}</span></div>`; }
+/* 💰 마감정산 — 26-10-16 사장님이 정한 순서 (v22)
+   「총현금을 다 세게 하고 적게 하면 애들이 어려워할 수 있으니, 일단 시재를 맞추게 하고 시재 부족액을 적게끔 하고
+    그다음 남은 현금들을 적게 하면서 동시에 계좌이체 여부를 확인하게끔」 · 「계좌이체 있음 여부 (반드시 체크하게끔)」
+   ① 오늘 현금·계좌이체로 받은 돈? 없음 → 시재만 / 있음 → ② 시재 맞추기(맞음·부족 ○원) → ③ 남은 현금 ○원 + 계좌이체 있었나(필수)
+   다음 날 08:00 사장앱: 포스 현금매출 − (남은 현금 − 시재 부족) = 차이 → 맞음 / 부족·남음 / 이체 약 ○원
+   (v17~v21 의 「받은 현금·계좌이체 금액」 칸은 이걸로 대체) */
+let CF={money:null,short:0,pile:'',xfer:null};
 const 원글 = v=>{ const n=String(v||'').replace(/[^0-9]/g,''); return n?(+n).toLocaleString():''; };
-function 정산값(){ const c=$('#stCash'), x=$('#stXfer'); if(c&&!ST.cashNone) ST.cash=c.value.replace(/[^0-9]/g,''); if(x&&!ST.xferNone) ST.xfer=x.value.replace(/[^0-9]/g,''); return ST; }
+/* 🔴 순서 — 사장님 26-10-16: 「그냥 바로 순서를 시재 확인을 시키고 나서 하자」
+   이유: 「시재부족과 들어온 현금을 알렸지만, 돈통을 초기화 안시키는 경우가 있음」
+   → ① 시재 10만원 맞추기(맞음/부족) 를 먼저 끝내야 ② 받은 돈 있었나 → ③ 남은 현금 + 계좌이체 로 갑니다
+   (같은 날 낮 판은 「받은 돈 있었나」가 먼저였음 — 올리기 전에 바뀜) */
 function sheetCash(){
-  openSheet(`<h2>마감정산</h2><p class="hint">오늘 <b>실제로 받은</b> 현금 · 계좌이체를 적어 주세요. 없으면 「없음」 · 포스 숫자와는 다음 날 아침 사장님 앱이 맞춰 봅니다</p>
-    <div class="cashrow" style="gap:8px"><b style="line-height:1.25">💵 받은 현금<small style="display:block;font-weight:500;color:var(--muted);font-size:12px">돈통에 들어온 것</small></b><input class="field num" id="stCash" inputmode="numeric" placeholder="금액" value="${ST.cashNone?'':원글(ST.cash)}" ${ST.cashNone?'disabled':''} style="text-align:right;max-width:140px;${ST.cashNone?'opacity:.35':''}"><button class="icon-btn ${ST.cashNone?'on':''}" data-act="stNone" data-k="cash" aria-pressed="${ST.cashNone}" style="width:auto;padding:0 12px;font-weight:700">없음</button></div>
-    <div class="cashrow" style="gap:8px"><b style="line-height:1.25">🏦 계좌이체<small style="display:block;font-weight:500;color:var(--muted);font-size:12px">통장으로 받은 것</small></b><input class="field num" id="stXfer" inputmode="numeric" placeholder="금액" value="${ST.xferNone?'':원글(ST.xfer)}" ${ST.xferNone?'disabled':''} style="text-align:right;max-width:140px;${ST.xferNone?'opacity:.35':''}"><button class="icon-btn ${ST.xferNone?'on':''}" data-act="stNone" data-k="xfer" aria-pressed="${ST.xferNone}" style="width:auto;padding:0 12px;font-weight:700">없음</button></div>
-    <div class="banner" id="stExpect" style="margin-top:12px;background:color-mix(in srgb,var(--accent) 10%,var(--surface))">${있어야할돈()}</div>
-    <h2 style="margin-top:10px">시재</h2><p class="hint">돈통을 세어 보고 위 금액과 맞는지 골라 주세요.</p>
-    <div class="two"><button class="big-btn" data-act="cashok">시재 맞음</button><button class="big-btn" style="background:var(--beef)" data-act="cashshort">시재 부족</button></div>
-    <button class="link-btn" data-act="cashlater">나중에 하기</button>`);
+  CF={money:null,short:0,pile:'',xfer:null};
+  openSheet(`<h2>① 시재 맞추기</h2><p class="hint">돈통 시재를 <b>${won(STORE.cashBase)}</b>에 맞춰 주세요. 남는 현금은 <b>왼쪽에 따로</b> 둡니다. 딱 맞추기 어려우면 모자란 만큼을 「부족」으로.</p>
+    <div class="two"><button class="big-btn" data-act="cashok">시재 맞음</button><button class="big-btn" style="background:var(--beef)" data-act="cashshort">시재 부족</button></div>`);
 }
+function 받은돈창(){
+  openSheet(`<h2>② 받은 돈</h2><p class="hint">오늘 <b>현금</b>이나 <b>계좌이체</b>로 받은 돈이 있었나요? (카드만 받았으면 「없음」)${CF.short?`<br>시재 부족 ${won(CF.short)} 적어 둠`:''}</p>
+    <div class="two"><button class="big-btn sec" data-act="cfMoney" data-v="N">없음 — 마감 완료</button><button class="big-btn" data-act="cfMoney" data-v="Y">있음</button></div>
+    <button class="link-btn" data-act="cashback">처음으로</button>`);
+}
+function 남은현금창(){
+  const 됨 = CF.pile!=='' && CF.xfer!=null;
+  openSheet(`<h2>③ 남은 현금</h2><p class="hint">돈통 <b>왼쪽 현금을 전부</b> 세어 적어 주세요. <b>어제 것이 남아 있어도 같이</b> 셉니다.${CF.short?` (시재 부족 ${won(CF.short)} 적어 둠)`:''}</p>
+    <input class="field num" id="cfPile" inputmode="numeric" placeholder="남은 현금 (원)" value="${원글(CF.pile)}" style="text-align:right;font-size:22px">
+    <div style="margin-top:14px;padding:10px 12px;border-radius:12px;background:var(--paper)"><div style="font-size:14px;font-weight:700;margin-bottom:8px">🏦 계좌이체로 받은 것도 있었나요? <span style="color:var(--beef)">꼭 골라 주세요</span></div>
+      <div class="two"><button class="big-btn ${CF.xfer==='N'?'':'sec'}" style="margin:0;padding:11px;font-size:15px" data-act="cfXfer" data-v="N">없었음</button><button class="big-btn ${CF.xfer==='Y'?'':'sec'}" style="margin:0;padding:11px;font-size:15px" data-act="cfXfer" data-v="Y">있었음</button></div></div>
+    <button class="big-btn" data-act="cfDone" ${됨?'':'disabled'}>${됨?'마감 완료':'남은 현금 · 계좌이체 여부를 채워 주세요'}</button>
+    <button class="link-btn" data-act="cashback">처음으로</button>`);
+}
+function 시재다음(short){ CF.short=short||0; 받은돈창(); }
 let cashM=0,cashK=0;
 function sheetShort(){
   const sum=cashM*10000+cashK*1000;
-  openSheet(`<h2>얼마가 비었습니까?</h2><p class="hint">부족한 만큼만 눌러 주세요.</p>
+  openSheet(`<h2>얼마가 비었습니까?</h2><p class="hint">시재 ${won(STORE.cashBase)}에서 모자란 만큼만 눌러 주세요.</p>
     <div class="cashrow"><b>만원</b><span class="qty"><button data-act="cm" data-d="-1">−</button><output class="num">${cashM}</output><button data-act="cm" data-d="1">+</button></span></div>
     <div class="cashrow"><b>천원</b><span class="qty"><button data-act="ck1" data-d="-1">−</button><output class="num">${cashK}</output><button data-act="ck1" data-d="1">+</button></span></div>
     <p class="hint">⚠️ 천원짜리가 모자라 채워야 하면 10장 넘게도 됩니다</p>
     <div class="cashsum num">${won(sum)} 부족</div>
-    <button class="big-btn" style="background:var(--beef)" data-act="cashsend" ${sum?'':'disabled'}>사장님께 알리고 완료</button>
-    <button class="link-btn" data-act="cashback">다시 고르기</button>`);
+    <button class="big-btn" style="background:var(--beef)" data-act="cashsend" ${sum?'':'disabled'}>다음</button>
+    <button class="link-btn" data-act="cashback">처음으로</button>`);
 }
 /* ↪ 「내일로」는 누르는 순간 서버에 (26-10-09)
    사장님: 「중간에 내일로 미룸을 체크하고 꺼버리면 이게 가지 않는 경우가 있는 것 같음」
@@ -934,19 +943,19 @@ async function finishClose(cash){
   /* ⚠️ 26-10-02 「오픈·마감 했을 때 속도가 너무 느림」
      서버 세 곳을 하나씩 기다린 뒤에야 화면이 바뀌었습니다 (깨우는 데만 2~5초씩).
      → 화면 먼저 「완료」, 보내기는 뒤에서. 순서(시재 → 완료 → 넘기기)는 그대로 지킵니다 */
-  S.close.done=hhmm(); S.close.cash=cash==null?null:cash; if(정산됨()) S.close.settle={cash:+ST.cash||0,xfer:+ST.xfer||0}; save(); closeSheet(); rerender();
-  const 보낼정산={...ST, 됨:정산됨()}; ST={cash:'',xfer:'',cashNone:false,xferNone:false};
+  S.close.done=hhmm(); S.close.cash=cash==null?null:cash; if(CF.money) S.close.settle={money:CF.money,pile:+CF.pile||0,xfer:CF.xfer}; save(); closeSheet(); rerender();
+  const 보낼정산={...CF}; CF={money:null,short:0,pile:'',xfer:null};
   toast(carried.length?`마감 완료. 내일 오픈으로 ${carried.length}개 넘김`:'마감 완료');
   closing=false;
   (async()=>{
     if(cash>0) await API.post(STORE.closeGas,{action:'cash',date:BD_KEY,short:cash,device:DEVICE,branch:STORE.branch});
-    if(보낼정산.됨) await API.post(STORE.closeGas,{action:'settle',date:BD_KEY,cashSales:+보낼정산.cash||0,transfer:+보낼정산.xfer||0,short:cash==null?'':cash,device:DEVICE,branch:STORE.branch});
+    if(보낼정산.money) await API.post(STORE.closeGas,{action:'settle',v:2,date:BD_KEY,money:보낼정산.money,pile:보낼정산.money==='Y'?(+보낼정산.pile||0):0,xfer:보낼정산.money==='Y'?보낼정산.xfer:'N',short:cash==null?'':cash,device:DEVICE,branch:STORE.branch});
     await API.post(STORE.closeGas,{action:'complete',date:BD_KEY});
     if(carried.length) await API.post(STORE.closeGas,{action:'carryover',fromDate:BD_KEY,targetDate:nextDayKey(),items:carried});
   })().catch(()=>toast('⚠️ 인터넷이 끊겨 마감 기록이 못 갔을 수 있습니다. 와이파이 확인 후 사장님께 알려 주세요'));
   // 🔔 사장님 (26-10-02): 「마감체크가 완료되었을때 알림이 울리게끔」 → 사장앱 + 다른 직원 폰 (누른 폰은 빼고)
   //    ⚠️ 답장을 안 기다립니다 (no-cors). 알림이 안 가도 마감은 이미 끝났습니다
-  if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length,sales:보낼정산.cash===''?null:+보낼정산.cash,xfer:보낼정산.xfer===''?null:+보낼정산.xfer})}).catch(()=>{});
+  if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length})}).catch(()=>{});
 }
 
 /* ══════════════ 서버 동기화 ══════════════ */
@@ -1281,14 +1290,15 @@ document.addEventListener('click', async e=>{
     case 'tocart2': { const id=b.dataset.id, rows=발주표[id]; closeSheet(); cartAdd(id, b.dataset.i==='all'?rows:[rows[+b.dataset.i]]); break; }
     case 'mck': { const id=b.dataset.id; S.monthly.checks[id]=S.monthly.checks[id]?null:`${BD.getMonth()+1}/${BD.getDate()}`; save(); rerender(); API.post(STORE.closeGas,{action:'toggleMonthly',month:MONTH_KEY,itemId:id,checked:!!S.monthly.checks[id]}); break; }
     case 'closedone': sheetCash(); break;
-    case 'stNone': { 정산값(); const k=b.dataset.k; ST[k+'None']=!ST[k+'None']; if(ST[k+'None']) ST[k]=''; sheetCash(); break; }
-    case 'cashok': { 정산값(); if(!정산됨()){ toast('받은 현금 · 계좌이체 — 금액을 적거나 「없음」을 눌러 주세요'); break; } finishClose(0); break; }
+    case 'cfMoney': CF.money=b.dataset.v; if(CF.money==='Y') 남은현금창(); else finishClose(CF.short); break;
+    case 'cfXfer': { const x=$('#cfPile'); if(x) CF.pile=x.value.replace(/[^0-9]/g,''); CF.xfer=b.dataset.v; 남은현금창(); break; }
+    case 'cfDone': { const x=$('#cfPile'); if(x) CF.pile=x.value.replace(/[^0-9]/g,''); if(CF.pile===''||CF.xfer==null){ toast('남은 현금과 계좌이체 여부를 채워 주세요'); break; } finishClose(CF.short); break; }
+    case 'cashok': 시재다음(0); break;
     // 26-10-16 사장님: 「마감 후 현금과 계좌이체를 입력하게 했는데 데이터가 쌓이고 있는지?」 → 10/15 가 비어 있었음 (「나중에 하기」로 금액 없이 넘어간 것으로 보임)
-    case 'cashlater': { 정산값(); if(!정산됨()){ toast('시재는 나중에 세도, 받은 현금 · 계좌이체는 금액이나 「없음」'); break; } finishClose(null); break; }
-    case 'cashshort': { 정산값(); if(!정산됨()){ toast('받은 현금 · 계좌이체 — 금액을 적거나 「없음」을 눌러 주세요'); break; } cashM=0;cashK=0; sheetShort(); break; }
+    case 'cashshort': cashM=0;cashK=0; sheetShort(); break;
     case 'cm': cashM=Math.max(0,cashM+ +b.dataset.d); sheetShort(); break;
     case 'ck1': cashK=Math.max(0,cashK+ +b.dataset.d); sheetShort(); break;   // 26-10-14 「천원 단위에서 9개 이상을 못하게 … 되게끔」 — 9 제한 뺌
-    case 'cashsend': finishClose(cashM*10000+cashK*1000); break;
+    case 'cashsend': 시재다음(cashM*10000+cashK*1000); break;
     case 'cashback': sheetCash(); break;
     case 'undo': S.close.done=false; S.close.cash=null; S.close.settle=null; save(); rerender(); break;
 
@@ -1345,7 +1355,7 @@ document.addEventListener('change', async e=>{
   }
 });
 document.addEventListener('input', e=>{
-  if(e.target.id==='stCash'||e.target.id==='stXfer'){ e.target.value=원글(e.target.value); 정산값(); const x=$('#stExpect'); if(x) x.innerHTML=있어야할돈(); return; }
+  if(e.target.id==='cfPile'){ e.target.value=원글(e.target.value); CF.pile=e.target.value.replace(/[^0-9]/g,''); const d=document.querySelector('[data-act="cfDone"]'); if(d){ const 됨=CF.pile!==''&&CF.xfer!=null; d.disabled=!됨; d.textContent=됨?'마감 완료':'남은 현금 · 계좌이체 여부를 채워 주세요'; } return; }
   if(e.target.id==='rAmt'){ const el=e.target, back=el.value.length-el.selectionStart, n=el.value.replace(/[^0-9]/g,'');
     el.value=n?Number(n).toLocaleString('ko-KR'):''; R.amt=el.value; const p=Math.max(0,el.value.length-back); try{el.setSelectionRange(p,p);}catch(_){}
     $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
