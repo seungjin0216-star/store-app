@@ -247,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-15-v19';
+const APP_VERSION = '2026-10-16-v20';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -289,7 +289,7 @@ const MIN_ORDER = 1, MAX_ORDER = 2;
 
 const SUPS = [
   { key:'미락', emoji:'🏪', qtyOnly:['부추','김가루','날치알','우동사리','메밀면','대파'],
-    items:['부추','양파','김가루','배추','라면','다진김치','포기김치','날치알','고추가루','우동사리','후리가께','메밀면','대파','고추','마늘','설탕','간장','식초','굵은소금','꽃소금'] },
+    items:['부추','양파','김가루','배추','라면','다진김치','포기김치','날치알','고추가루','우동사리','후리가께','메밀면','대파','고추','통마늘','설탕','간장','식초','굵은소금','꽃소금'] },
   { key:'콩나물', emoji:'🌱', qty:true, items:['콩나물'] },
   { key:'원당', emoji:'🧂', items:['깍두기','불쇼술'] },
   { key:'네이버', emoji:'🛒', groups:[
@@ -317,7 +317,7 @@ const 발주표 = {
   gs1:[['사장님','국수소스',1]], gs2:[['사장님','파장소스',1]], gs3:[['네이버','들기름',1]],
   f_ramen:[['미락','라면',1]], f_fruit:[['네이버','과일',1]],
   gl1:[['미락','대파',1]], gl2:[['미락','고추',1]], gl3:[['미락','대파',1]], gl4:[['미락','배추',1]],
-  gl5:[['미락','대파',1]], gl6:[['네이버','단무지',1]], gl7:[['사장님','다대기',1]], gl8:[['미락','마늘',1]],
+  gl5:[['미락','대파',1]], gl6:[['네이버','단무지',1]], gl7:[['사장님','다대기',1]], gl8:[['미락','통마늘',1]],
   gl9:[['미락','포기김치',1]], gl10:[['네이버','미나리',1]],
   gr2:[['미락','대파',5]], gr3:[['미락','다진김치',1]], gr4:[['원당','깍두기',1]],
   g6_2:[['미락','고추',1]], g6_3:[['콩나물','콩나물',1]], g6_4:[['네이버','레몬',1]], g6_5:[['네이버','오이',1]],
@@ -942,7 +942,7 @@ async function finishClose(cash){
   })().catch(()=>toast('⚠️ 인터넷이 끊겨 마감 기록이 못 갔을 수 있습니다. 와이파이 확인 후 사장님께 알려 주세요'));
   // 🔔 사장님 (26-10-02): 「마감체크가 완료되었을때 알림이 울리게끔」 → 사장앱 + 다른 직원 폰 (누른 폰은 빼고)
   //    ⚠️ 답장을 안 기다립니다 (no-cors). 알림이 안 가도 마감은 이미 끝났습니다
-  if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length})}).catch(()=>{});
+  if(LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'close',device:DEVICE,day:BD_KEY,cash:cash,carried:carried.length,sales:보낼정산.cash===''?null:+보낼정산.cash,xfer:보낼정산.xfer===''?null:+보낼정산.xfer})}).catch(()=>{});
 }
 
 /* ══════════════ 서버 동기화 ══════════════ */
@@ -1278,7 +1278,8 @@ document.addEventListener('click', async e=>{
     case 'mck': { const id=b.dataset.id; S.monthly.checks[id]=S.monthly.checks[id]?null:`${BD.getMonth()+1}/${BD.getDate()}`; save(); rerender(); API.post(STORE.closeGas,{action:'toggleMonthly',month:MONTH_KEY,itemId:id,checked:!!S.monthly.checks[id]}); break; }
     case 'closedone': sheetCash(); break;
     case 'cashok': { 정산값(); if(ST.cash===''||ST.xfer===''){ toast('현금 매출 · 계좌이체를 적어 주세요 (없으면 0)'); break; } finishClose(0); break; }
-    case 'cashlater': 정산값(); finishClose(null); break;
+    // 26-10-16 사장님: 「마감 후 현금과 계좌이체를 입력하게 했는데 데이터가 쌓이고 있는지?」 → 10/15 가 비어 있었음 (「나중에 하기」로 금액 없이 넘어간 것으로 보임)
+    case 'cashlater': { 정산값(); if(ST.cash===''||ST.xfer===''){ toast('시재는 나중에 세도, 현금 매출 · 계좌이체는 적어 주세요 (없으면 0)'); break; } finishClose(null); break; }
     case 'cashshort': { 정산값(); if(ST.cash===''||ST.xfer===''){ toast('현금 매출 · 계좌이체를 적어 주세요 (없으면 0)'); break; } cashM=0;cashK=0; sheetShort(); break; }
     case 'cm': cashM=Math.max(0,cashM+ +b.dataset.d); sheetShort(); break;
     case 'ck1': cashK=Math.max(0,cashK+ +b.dataset.d); sheetShort(); break;   // 26-10-14 「천원 단위에서 9개 이상을 못하게 … 되게끔」 — 9 제한 뺌
