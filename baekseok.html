@@ -247,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-16-v23';
+const APP_VERSION = '2026-10-16-v24';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -364,6 +364,9 @@ const MONTH_KEY = BD_KEY.slice(0,7);
    ══════════════════════════════════════════════════════════ */
 const LIVE = /github\.io$/.test(location.hostname);   // 깃허브 주소에서 열렸을 때만 실제로 보냅니다
 const DEVICE = (()=>{ try{ let id=localStorage.getItem('phoneId'); if(!id){ id=Math.random().toString(36).slice(2,6); localStorage.setItem('phoneId',id);} return id; }catch(e){ return 'temp'; } })();
+/* 🕐 26-10-16 사장님 캡처 「Sat Dec 30 1899 18:04:00 GMT+0827 (한국 표준시) 보냄」 → 「식자재 발주 하단처럼 시간만」
+   발주 서버가 시트의 「시각만 있는 칸」을 날짜째 글로 줌 (1899-12-30 = 시트의 0일) → 화면에서 시:분만 뽑음 */
+const 시분 = v=>{ if(v==null||v==='') return v; const m=String(v).match(/(\d{1,2}):(\d{2})/); return m?`${m[1].padStart(2,'0')}:${m[2]}`:String(v); };
 const UA = (()=>{ const u=navigator.userAgent||''; return /iPhone/i.test(u)?'iPhone':/iPad/i.test(u)?'iPad':/SM-|Galaxy/i.test(u)?'Galaxy':/Android/i.test(u)?'Android':/Macintosh/i.test(u)?'Mac':/Windows/i.test(u)?'Windows':'기타'; })();
 
 const DEMO_Y = {
@@ -577,10 +580,10 @@ function rToday(){
     <p class="hint">위에서부터 하면 됩니다.</p>
     <div class="list">
       ${task(S.close.openDone?'ok':'idle','오픈 체크', S.close.openDone?'완료':'출근하면 먼저', S.close.openDone?'완료':'대기', S.close.openDone?'ok':'wait','t-close','open')}
-      ${noMeatIn&&!mt.recv?'':task(mt.recv?'ok':'idle','고기 입고 입력', mt.recv?mt.recv+' 보냄':'15:00까지', mt.recv?'완료':'대기', mt.recv?'ok':'wait','t-meat','recv')}
+      ${noMeatIn&&!mt.recv?'':task(mt.recv?'ok':'idle','고기 입고 입력', mt.recv?시분(mt.recv)+' 보냄':'15:00까지', mt.recv?'완료':'대기', mt.recv?'ok':'wait','t-meat','recv')}
       ${task(S.food.sent?'ok':'bad','식자재 발주', S.food.sent?(String(S.food.sent).includes('예약')?S.food.sent:S.food.sent+' 보냄'):'미락 22:25 마감', S.food.sent?'완료':'남음', S.food.sent?'ok':'warn','t-food')}
       ${STORE.liquorDays.includes(WD)?(()=>{ const st=sentOf('주류'); return task(st?'ok':'bad','🍶 주류 발주', st?st+' 보냄':'오늘은 주류 발주하는 날', st?'완료':'남음', st?'ok':'warn','t-food','주류'); })():''}
-      ${noMeat?'':task(mt.order?'ok':'bad','고기 발주', mt.order?mt.order+' 보냄':'22:00까지', mt.order?'완료':'남음', mt.order?'ok':'warn','t-meat','order')}
+      ${noMeat?'':task(mt.order?'ok':'bad','고기 발주', mt.order?시분(mt.order)+' 보냄':'22:00까지', mt.order?'완료':'남음', mt.order?'ok':'warn','t-meat','order')}
       ${task(S.close.done?'ok':'idle','마감 체크', S.close.done?'완료':'영업 끝나고', S.close.done?'완료':'저녁', S.close.done?'ok':'wait','t-close','close')}
     </div>
 
@@ -670,7 +673,7 @@ function rMeat(){
   if(m.mode==='order'){
     const c=meatCalc();
     el.innerHTML = seg + (STORE.noMeatOrderDays.includes(WD)?`<div class="banner red"><span class="em">🚫</span><div><b>오늘은 고기 발주 없는 날</b><span>입력하지 않아도 됩니다</span></div></div>`:'') + (isMon?`<div class="banner warn"><span class="em">⚠️</span><div><b>월요일 발주 — 업체 화요일 휴무</b><span>저장해 두면 화요일 20:00에 자동 발송, 수요일 납품</span></div></div>`:'')
-    + (m.sent.order?`<div class="banner green"><span class="em">✅</span><div><b>오늘 고기 발주 나감 · ${m.sent.order}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 업체에 「⚠️ 정정」 문자로 갑니다</span></div></div>`:'')
+    + (m.sent.order?`<div class="banner green"><span class="em">✅</span><div><b>오늘 고기 발주 나감 · ${시분(m.sent.order)}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 업체에 「⚠️ 정정」 문자로 갑니다</span></div></div>`:'')
     + `<h2>곱창 재고</h2><p class="hint">지금 남은 양을 보 단위로 적어 주세요.</p>
       <div class="list">
         <div class="row"><span class="main">쓰고 있는 것<span class="sub">현재 홀 사용 중</span></span>${valBtn('meat.order.use','보','쓰고 있는 곱창')}</div>${요일칸('use')}
@@ -690,7 +693,7 @@ function rMeat(){
   } else {
     el.innerHTML = seg
     + (STORE.noMeatInDays.includes(WD)&&!m.sent.recv?`<div class="banner red"><span class="em">🚚</span><div><b>오늘은 고기 입고 없는 날</b><span>일·화는 업체가 쉽니다. 입력하지 않아도 됩니다</span></div></div>`:'')
-    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${m.sent.recv}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
+    + (m.sent.recv?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${시분(m.sent.recv)}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
     + `<h2>오늘 들어온 양</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
       <div class="list">
         <div class="row"><span class="main">곱창</span>${valBtn('meat.recv.gc','보','곱창 입고')}</div>
