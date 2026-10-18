@@ -1,0 +1,12 @@
+{
+  "name": "장수 매장앱 · 원당",
+  "short_name": "원당 매장",
+  "start_url": "wondang.html",
+  "display": "standalone",
+  "background_color": "#F4F6F5",
+  "theme_color": "#E0662B",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

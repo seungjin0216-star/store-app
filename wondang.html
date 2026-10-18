@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F6F5">
+<title>장수 매장앱 · 원당</title>
+<link rel="manifest" href="manifest-wondang.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="원당 매장">
+<!-- 🔴 구글 폰트를 뺐습니다 (2026-10-01 · 사장님 확인)
+     IBM Plex Sans KR 은 한글이라 조각 282개로 쪼개져 있습니다.
+     한글 화면이면 수십 개를 받고, 굵기 3종이라 ×3 입니다.
+     ⚠️ 용량보다 **요청 횟수**가 문제였습니다. 매장 와이파이에서 수십 번 왕복하는
+        동안 화면이 멎었습니다. 게다가 <link rel=stylesheet> 는 렌더를 막는 자리입니다.
+     → 아이폰은 애플 산돌고딕, 갤럭시는 노토산스를 씁니다. 둘 다 깔끔한 한글 글꼴입니다.
+     ⚠️ 글꼴을 다시 넣고 싶으면 body 의 font-family 만 바꾸면 됩니다.
+        다만 「주춤거리면 아무도 안 쓴다」가 이 앱의 기준입니다. -->
+<style>
+:root{
+  --paper:#F4F6F5; --surface:#FFFFFF; --ink:#1C2529; --muted:#5E6B70; --line:#DCE2E0;
+  --char:#24323A; --beef:#B3261E; --done:#2E7D4F; --accent:#1F6F8B; --warm:#A8741A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12191C; --surface:#1B2428; --ink:#E8EEEC; --muted:#9AA8AC; --line:#2C383D;
+    --char:#0C1215; --beef:#E5675E; --done:#5BB585; --accent:#5BB2D1; --warm:#D9A44A;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12191C; --surface:#1B2428; --ink:#E8EEEC; --muted:#9AA8AC; --line:#2C383D;
+  --char:#0C1215; --beef:#E5675E; --done:#5BB585; --accent:#5BB2D1; --warm:#D9A44A;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",
+              "Malgun Gothic",system-ui,"Helvetica Neue",sans-serif;
+  font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;word-break:keep-all;
+  -webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+/* ⚠️ 26-10-02 「페이지 넘기는 속도가 느림」 — 두 번 눌러 확대를 기다리는 틈(최대 0.3초)을 없앱니다 */
+html{touch-action:manipulation}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:480px;margin:0 auto}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.top-in{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px}
+.app-name{font-weight:700;font-size:19px}
+.app-name small{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+.demo{font-size:12px;color:var(--warm);border:1px solid var(--warm);border-radius:6px;padding:2px 7px;white-space:nowrap}
+
+main{padding:14px 20px 110px}
+.screen{display:none}.screen.on{display:block}
+h2{font-size:17px;margin:24px 0 8px}
+h2:first-child{margin-top:4px}
+h3{font-size:14px;color:var(--muted);font-weight:500;margin:16px 0 6px}
+.hint{color:var(--muted);font-size:14px;margin:0 0 10px}
+
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+/* ⚠️ box-sizing 을 직접 적습니다 (26-10-01) — 접히는 묶음(details) 안의 줄은 물려받지 못해
+   폭이 37px 넘쳐 🛒 가 잘렸습니다. 「마감체크 폰화면 밀림」의 원인 */
+.row{box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line);width:100%;text-align:left;background:transparent;border-left:0;border-right:0;border-bottom:0;min-height:52px}
+.row:first-child{border-top:0}
+.row .main{flex:1;min-width:0}
+.row .sub{display:block;font-size:13px;color:var(--muted)}
+.tag{font-size:12px;padding:3px 8px;border-radius:6px;white-space:nowrap;font-weight:500}
+.tag.warn{background:color-mix(in srgb,var(--beef) 14%,transparent);color:var(--beef)}
+.tag.ok{background:color-mix(in srgb,var(--done) 14%,transparent);color:var(--done)}
+.tag.wait{background:color-mix(in srgb,var(--muted) 14%,transparent);color:var(--muted)}
+.tag.info{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot.ok{background:var(--done)}.dot.bad{background:var(--beef)}.dot.idle{background:var(--line)}
+
+.check{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:15px;color:transparent}
+.on-check .check{background:var(--done);border-color:var(--done);color:#fff}
+.on-check .main{color:var(--muted);text-decoration:line-through}
+.carried .main{color:var(--muted)}
+.carried .check{border-style:dashed}
+
+.icon-btn{border:1px solid var(--line);background:var(--paper);border-radius:10px;height:36px;min-width:40px;padding:0 8px;font-size:15px;flex:none}
+.icon-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.banner{border-radius:14px;padding:14px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start}
+.banner b{display:block}
+.banner span{font-size:14px}
+.banner.green{background:color-mix(in srgb,var(--done) 14%,var(--surface));}
+.banner.warn{background:color-mix(in srgb,var(--warm) 14%,var(--surface));}
+.banner.red{background:color-mix(in srgb,var(--beef) 12%,var(--surface));}
+.banner .em{font-size:24px;line-height:1.2}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);margin-bottom:14px}
+.seg button{flex:1;border:0;background:transparent;padding:11px 0;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.supbar{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin:0 -20px 12px;padding-left:20px;padding-right:20px;scrollbar-width:none}
+.supbar::-webkit-scrollbar{display:none}
+.supbar button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 12px;font-size:15px;position:relative}
+.supbar button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+.supbar .cnt{margin-left:6px;font-size:12px;background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px}
+/* 이미 발주가 나간 업체 — 눈에 바로 들어와야 합니다 (사장님 요청 26-10-01) */
+.supbar button.sent{background:color-mix(in srgb,var(--done) 16%,var(--surface));border-color:var(--done)}
+.supbar .sentmark{margin-left:6px;font-size:12px;background:var(--done);color:#fff;border-radius:99px;padding:1px 7px;font-weight:500}
+
+.val{min-width:76px;height:42px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-weight:700;font-size:18px;text-align:right;padding:0 10px}
+.val.empty{color:var(--muted);font-weight:400}
+.val small{font-size:13px;font-weight:400;color:var(--muted);margin-left:3px}
+.qty{display:flex;align-items:center;gap:8px}
+.qty button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--paper);font-size:18px}
+.qty output{min-width:26px;text-align:center;font-weight:700}
+
+.calc{background:var(--char);color:#fff;border-radius:14px;padding:14px 16px;margin-top:12px}
+.calc .big{font-size:26px;font-weight:700}
+.calc .sm{font-size:13px;opacity:.8}
+
+.ctabs{display:flex;gap:6px;margin:4px 0 12px;position:sticky;top:0;z-index:5;background:var(--paper);padding:6px 0}
+.ctabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 0;font-weight:600;font-size:14px;color:var(--muted)}
+.ctabs button small{display:block;font-size:11px;font-weight:700;opacity:.8}
+.ctabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ctabs button.all{border-color:var(--done);color:var(--done)}
+.ctabs button.all[aria-pressed="true"]{background:var(--done);color:#fff}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;background:var(--done);transition:width .2s}
+
+details.grp{border-top:1px solid var(--line)}
+details.grp:first-child{border-top:0}
+details.grp summary{list-style:none;display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;font-weight:500}
+details.grp summary::-webkit-details-marker{display:none}
+details.grp summary::after{content:"▾";color:var(--muted);transition:transform .15s}
+details.grp[open] summary::after{transform:rotate(180deg)}
+/* 🎨 26-10-14 사장님: 「대분류(아코디언) 소분류 … 대분류에 색칠을 해줘 … 하위항목들과 구분되게 카드 바탕에 색」
+   묶음마다 --gc 한 색 → 머리줄 바탕은 옅게 · 왼쪽 굵은 띠 · 이름은 진하게. 펼친 안쪽은 아주 옅게 */
+details.grp[style*="--gc"] summary{background:color-mix(in srgb,var(--gc) 17%,var(--surface));box-shadow:inset 6px 0 0 var(--gc);font-weight:700}
+details.grp[style*="--gc"][open] summary{background:color-mix(in srgb,var(--gc) 26%,var(--surface))}
+details.grp[style*="--gc"] .row{background:color-mix(in srgb,var(--gc) 5%,var(--surface));box-shadow:inset 6px 0 0 color-mix(in srgb,var(--gc) 45%,transparent)}
+/* 📅 고기 요일 칸 */
+.shake{animation:shk .45s}
+@keyframes shk{0%,100%{transform:none}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
+.dayrow.need{box-shadow:inset 0 0 0 2px var(--beef);background:color-mix(in srgb,var(--beef) 8%,var(--surface))}
+.dayrow{padding-top:6px;padding-bottom:10px;background:color-mix(in srgb,var(--warm) 6%,var(--surface))}
+.days{display:flex;gap:4px;flex:1;justify-content:flex-end}
+.days button{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;padding:0}
+.days button[aria-pressed="true"]{background:var(--warm);border-color:var(--warm);color:#fff}
+details.grp .row{padding-left:28px;background:color-mix(in srgb,var(--paper) 50%,var(--surface))}
+
+.big-btn{width:100%;border:0;border-radius:14px;background:var(--accent);color:#fff;padding:16px;font-weight:700;font-size:17px;margin-top:16px}
+.big-btn:disabled{opacity:.4;cursor:not-allowed}
+.big-btn.sec{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.link-btn{background:none;border:0;color:var(--muted);text-decoration:underline;padding:12px;width:100%}
+.ghost{background:transparent;border:1.5px dashed var(--line);color:var(--muted);border-radius:14px;padding:30px 16px;width:100%;text-align:center;display:block;cursor:pointer}
+.ghost b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+.sentbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;white-space:pre-wrap;font-size:14px}
+.thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:var(--line)}
+
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .wrap{display:flex}
+nav.tabs button{flex:1;border:0;background:transparent;padding:9px 0 11px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+nav.tabs .ic{font-size:20px;line-height:1}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
+nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--beef)}
+
+.today{background:var(--char);color:#fff;border-radius:18px;padding:14px 16px 6px;margin-bottom:6px}
+.today-h{font-size:13px;opacity:.75;margin-bottom:4px}
+.today-r{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid #ffffff1f}
+.today-r:first-of-type{border-top:0}
+.today-r .em{font-size:22px;line-height:1.25}
+.today-r b{display:block;font-size:17px}
+.today-r span{font-size:15px;opacity:.85}
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.doc{border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:16px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.doc .e{font-size:26px;line-height:1}
+.doc small{color:var(--muted);font-size:12px}
+.doc{cursor:pointer}
+.doc:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.doc.sel,.doc[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.field{width:100%;height:50px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:17px;padding:0 14px}
+.fields{display:grid;grid-template-columns:2fr 1.3fr;gap:8px;margin-top:12px}
+.qerr{display:block;font-size:13px;color:var(--beef)}
+/* 아래에서 올라오는 판 */
+.ov{position:fixed;inset:0;z-index:20;background:#0009;display:none;align-items:flex-end;justify-content:center}
+.ov.show{display:flex}
+.sheet{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));max-height:88%;overflow-y:auto}
+.sheet h2{margin-top:0}
+.pad-disp{font-size:40px;font-weight:700;text-align:right;padding:4px 6px 12px;border-bottom:2px solid var(--accent);margin-bottom:12px}
+.pad-disp small{font-size:18px;color:var(--muted);font-weight:400;margin-left:4px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{height:58px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-size:22px;font-weight:500}
+.cashrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.cashsum{font-size:28px;font-weight:700;text-align:center;margin:16px 0 4px;color:var(--beef)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two .big-btn{margin-top:0}
+
+.icon-btn.q{min-width:36px;font-weight:700;color:var(--accent)}
+/* ❓ 기준·방법 — 기존 마감 앱과 같은 꼴 */
+.man-step{margin-top:14px}.man-step:first-child{margin-top:4px}
+.man-img{width:100%;border-radius:12px;display:block;border:1px solid var(--line);background:var(--paper)}
+.man-cap{font-size:12px;color:var(--muted);margin:6px 2px 10px;text-align:center}
+.man-l{display:flex;gap:9px;margin-bottom:11px;align-items:flex-start}
+.man-n{flex:0 0 22px;height:22px;border-radius:50%;background:var(--char);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+.man-tx{flex:1;font-size:15px;line-height:1.65}
+.man-tt{font-weight:700;margin-bottom:3px}
+.man-bad{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--beef) 12%,var(--surface));font-size:14px}
+.man-why{margin-top:10px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--warm) 14%,var(--surface));font-size:14px}
+.man-txt{white-space:pre-wrap;font-size:15px;line-height:1.7}
+.newver{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:40;background:var(--accent);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:700;font-size:15px;box-shadow:0 4px 16px #0003;display:none;white-space:nowrap}
+.newver.show{display:block}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--char);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+
+button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<style>
+/* 🧽 청소 카드 — 카드마다 색 (사장님 「각 카드별로 색칠해서 구분」) */
+.cl-card{margin-bottom:10px;border-radius:16px;background:color-mix(in srgb,var(--c) 9%,var(--surface));border-left:6px solid var(--c);overflow:hidden}
+.cl-card .list{border:0;border-radius:0;background:transparent}
+.cl-card summary{list-style:none;display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer}
+.cl-card summary::-webkit-details-marker{display:none}
+.cl-card summary .main{flex:1}.cl-card summary .sub{display:block;font-size:13px;color:var(--muted)}
+.cl-card details .row,.cl-card .row{background:transparent}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap top-in">
+  <div class="app-name">장수 매장앱<small id="dateLabel">원당점</small></div>
+  <span class="demo" id="modePill" title="여기서는 아무것도 보내지 않습니다">미리보기</span>
+</div></header>
+<main class="wrap" id="main">
+  <section class="screen" id="t-food"></section>
+  <section class="screen" id="t-clean"></section>
+  <section class="screen" id="t-rcpt"></section>
+</main>
+<nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
+<div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   장수 매장앱 (직원용) — 원당 · 2026-10-18
+   사장님: 「원당 통합앱(직원) — 백석과 다르게 탭은 5개가 아닌 3개만 존재 (식자재발주, 청소체크, 영수증)」
+   ⚠️ 백석(baekseok.html)과 **다른 파일**입니다 — 백석은 매일 쓰는 중이라 한 파일로 합치다 깨질까 봐 따로 만듦
+      영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
+   서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
+   ══════════════════════════════════════════════════════════ */
+const APP_VERSION = '2026-10-18-w1';
+const STORE = {
+  name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
+  orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
+  closeGas: 'https://script.google.com/macros/s/AKfycbxeauYyGzxWMcPSrpHAidBAnYMuIZW3XqmGg1gTomZfuM7vdmfJl2y-VG1Hk72ohFhTZg/exec',
+  receiptGas: 'https://script.google.com/macros/s/AKfycbxKmN_Uo5hIGPm8ITQhM80FxinEL6q1dFiHZAaGR-eRsBb9EDno4C8et31a4mvwzkU9/exec',
+  pushApi: 'https://endearing-frangollo-dc109d.netlify.app/.netlify/functions/owner-api',
+};
+/* 🛒 업체 — 사장님 「원당은 발주(콩나물, 주류, 음료수, 백석(대파김치))만 존재 · 원당은 계산이 필요 없고 그냥 수량으로 (미락 −,+ 처럼)」
+   원당 매장은 연중무휴 · 업체 정기휴무 정함 없음 · 주류도 언제든 → 예약 없이 바로 나감 */
+const SUPS = [
+  { key:'콩나물', emoji:'🌱', items:['콩나물'] },
+  { key:'주류',   emoji:'🍶', items:['참이슬후래쉬','처음처럼','새로','진로','참이슬빨뚜','카스','테라','켈리','일품진로','복분자','청하','매화수'] },
+  { key:'음료수', emoji:'🥤', items:['콜라','사이다','제로콜라','파인애플'] },
+  { key:'백석',   emoji:'🥬', items:['대파김치'] },
+];
+/* 🧽 청소 — 사장님이 정한 그대로 (26-10-18) · 위 주방 · 아래 홀 · 한 달 안에 / 기름확인은 3달 간격
+   「냉장고의 경우 아코디언인데 각 냉장고 별로 · 동시에 다 하기 어려운 것이 이유 · 기름확인도 아코디언 · 각 카드별로 색칠」
+   ⚠️ 같은 목록이 사장앱 서버(_owner.mjs CLEAN_WONDANG)에도 있음 — 주마다 알림용. 바꾸면 둘 다 */
+const CLEAN = [
+  { zone:'🍳 주방', items:[
+    { id:'w_oil', label:'기름 확인', every:3, color:'#E08A00', subs:[['w_oil_roof','옥상 확인'],['w_oil_back','창고 뒤 기름통 확인']] },
+    { id:'w_hood', label:'주방 후드 청소', every:1, color:'#3182F6' },
+    { id:'w_fridge', label:'냉장고 청소', every:1, color:'#21A366', subs:[['w_fr_big','큰 냉장고'],['w_fr_side','찬 냉장고'],['w_fr_meat','고기 냉장고']] },
+  ]},
+  { zone:'🪑 홀', items:[
+    { id:'w_liquor', label:'주류 냉장고 청소', every:1, color:'#8E5CF6' },
+    { id:'w_door', label:'현관 유리문 청소', every:1, color:'#F04452' },
+    { id:'w_window', label:'창문 · 창틀', every:1, color:'#0AA5A5' },
+  ]},
+];
+const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락',''],['관리비','⚡','매장관리비','전기 명세서']];
+const DIRECT_TYPES = [['배달매출','🛵','배달매출','월 1회'],['가게내부카드','💳','가게내부카드','월 합계'],['가게외부카드','🛒','가게외부카드','인터넷 주문'],['콩나물','🌾','콩나물',''],['키위','🥝','키위','보성'],['매장관리비','💧','매장관리비','수도 · 숫자'],['기타세금','🧾','기타세금',''],['기타잡비용','🧰','기타잡비용','']];
+/* ⚠️ 계정 이름은 원당 손익 그대로 (백석은 「가게카드」 · 원당은 「가게내부카드」「가게외부카드」 — 문서/10_복제_와꾸.md 6번) */
+
+const DAY = ['일','월','화','수','목','금','토'];
+const BD = (()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1); return d; })();
+const BD_KEY = `${BD.getFullYear()}-${String(BD.getMonth()+1).padStart(2,'0')}-${String(BD.getDate()).padStart(2,'0')}`;
+const MONTH_KEY = BD_KEY.slice(0,7);
+const LIVE = /github\.io$/.test(location.hostname);
+const DEVICE = (()=>{ try{ let id=localStorage.getItem('phoneId'); if(!id){ id=Math.random().toString(36).slice(2,6); localStorage.setItem('phoneId',id);} return id; }catch(e){ return 'temp'; } })();
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const won = n=>n.toLocaleString('ko-KR')+'원';
+let tt; function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),1800); }
+function hhmm(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function openSheet(html){ $('#sheet').innerHTML=html; $('#ov').classList.add('show'); }
+function closeSheet(){ $('#ov').classList.remove('show'); }
+$('#ov').addEventListener('click',e=>{ if(e.target.id==='ov') closeSheet(); });
+const recentSame = (sig) => { try{ const o=JSON.parse(localStorage.getItem('store-last-send')||'{}'); return o[sig] && Date.now()-o[sig] < 3*60e3; }catch(e){ return false; } };
+const markSent = (sig) => { try{ const o=JSON.parse(localStorage.getItem('store-last-send')||'{}'); Object.keys(o).forEach(k=>{ if(Date.now()-o[k]>10*60e3) delete o[k]; }); o[sig]=Date.now(); localStorage.setItem('store-last-send',JSON.stringify(o)); }catch(e){} };
+function b64u(s){ const p='='.repeat((4-s.length%4)%4); const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b,c=>c.charCodeAt(0)); }
+
+const API = {
+  LIVE, RECEIPT_LIVE: LIVE,
+  post(url, body){
+    if(!LIVE){ console.log('[미리보기] 안 보냄', body); return Promise.resolve(); }
+    return fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(()=>{});
+  },
+  jsonp(url, params, ms=12000){
+    if(!LIVE) return Promise.resolve(undefined);
+    return new Promise(done=>{
+      const cb='_cb'+Date.now()+Math.floor(Math.random()*1e6), sc=document.createElement('script'); let end=false;
+      const clean=()=>{ if(end)return; end=true; try{delete window[cb];}catch(e){} sc.remove(); };
+      window[cb]=r=>{ clean(); done(r); };
+      sc.onerror=()=>{ clean(); done(undefined); }; setTimeout(()=>{ if(!end){ clean(); done(undefined); } },ms);
+      sc.src=url+'?'+Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')+'&callback='+cb;
+      document.body.appendChild(sc);
+    });
+  },
+
+  photoExists(hash){
+    if(!hash) return Promise.resolve(undefined);
+    if(!LIVE) return Promise.resolve(demoHashes.has(hash)?{시각:'방금'}:null);
+    return this.jsonp(STORE.receiptGas,{action:'사진있나',store:STORE.receiptStore,h:hash},9000)
+      .then(r=>(r&&r.ok)?(r.있음?(r.정보||{}):null):undefined);
+  },
+  async uploadPhoto(q){
+    if(!LIVE){ await wait(300); if(q.hash) demoHashes.add(q.hash); return; }
+    await this.post(STORE.receiptGas,{base64:q.b64,mime:'image/jpeg',docType:q.docType,store:STORE.receiptStore,fname:q.fname,hash:q.hash});
+  },
+  direct(분류,금액,날짜,항목명){ return this.post(STORE.receiptGas,{action:'direct',store:STORE.receiptStore,분류,금액,날짜,항목명}); },
+};
+
+/* ── 상태 (이 폰) — 식자재 바구니는 날마다 새로 · 청소는 서버가 진실 ── */
+const SAVE_KEY='jangsoo-store-wondang';
+let S; try{ S=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){ S=null; }
+if(!S || S.day!==BD_KEY) S={ day:BD_KEY, food:{sup:'콩나물', cart:{}, sent:{}} };
+function save(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(S)); }catch(e){} }
+
+/* ── 탭 ── */
+const TABS=[['t-food','🥬','식자재발주'],['t-clean','🧽','청소체크'],['t-rcpt','🧾','영수증']];
+let cur='t-food';
+const RENDER={'t-food':rFood,'t-clean':rClean,'t-rcpt':rRcpt};
+function go(id){ cur=id; RENDER[id](); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); rTabs(); window.scrollTo(0,0); if(id==='t-clean') loadClean(); }
+function rerender(){ RENDER[cur](); rTabs(); }
+function rTabs(){ $('#tabs').innerHTML=TABS.map(([id,ic,l])=>`<button data-tab="${id}" aria-current="${id===cur?'page':'false'}"><span class="ic" aria-hidden="true">${ic}</span>${l}</button>`).join(''); }
+
+/* ══════════════ 🥬 식자재 발주 ══════════════
+   ⚠️ 원당 서버는 바구니가 없음 → 이 폰에 담고 「보내기」 때 업체별 문자 (옛 원당 발주앱 food.html 과 같은 서버·같은 꼴)
+   ⚠️ 두 폰이 같은 바구니를 보지 않음 — 한 사람이 보내면 다른 폰엔 「오늘 보낸 발주」가 안 보임 (확인 필요 · 필요하면 원당 서버를 백석처럼 바꿔야) */
+const supOf=k=>SUPS.find(s=>s.key===k)||SUPS[0];
+const qOf=(sup,item)=>S.food.cart[sup+':'+item]||0;
+const supCount=s=>s.items.filter(i=>qOf(s.key,i)>0).length;
+function 배달날(){ const d=new Date(BD); d.setDate(d.getDate()+1); return `${d.getMonth()+1}/${d.getDate()}(${DAY[d.getDay()]})`; }
+function 문자들(){ return SUPS.map(s=>{ const its=s.items.filter(i=>qOf(s.key,i)>0).map(i=>`${i} ${qOf(s.key,i)}`); return its.length?{supplier:s.key,emoji:s.emoji,items:its,body:`[원당점 발주 ${배달날()}]\n${its.join(', ')}`}:null; }).filter(Boolean); }
+function rFood(){
+  const f=S.food, sup=supOf(f.sup), 나감=Object.keys(f.sent||{});
+  $('#t-food').innerHTML = `
+    ${나감.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 보낸 발주</b><span>${나감.map(k=>`${supOf(k).emoji} ${k} ${f.sent[k]}`).join(' · ')}</span></div></div>`:''}
+    <div class="supbar" role="group" aria-label="업체">${SUPS.map(s=>{const n=supCount(s);return `<button class="${f.sent[s.key]?'sent':''}" data-act="sup" data-v="${s.key}" aria-pressed="${s.key===f.sup}">${s.emoji} ${s.key}${n?`<span class="cnt num">${n}</span>`:''}</button>`;}).join('')}</div>
+    <div class="list">${sup.items.map(it=>{ const q=qOf(sup.key,it); return `<div class="row"><span class="main">${esc(it)}</span><span class="qty"><button data-act="fq" data-k="${esc(sup.key+':'+it)}" data-d="-1" aria-label="${esc(it)} 줄이기">−</button><output class="num">${q}</output><button data-act="fq" data-k="${esc(sup.key+':'+it)}" data-d="1" aria-label="${esc(it)} 늘리기">+</button></span></div>`; }).join('')}</div>
+    <button class="big-btn" data-act="fpreview" ${문자들().length?'':'disabled'}>발주 보내기 (${문자들().length}곳)</button>
+    <p class="hint" style="text-align:center;margin-top:10px">원당은 연중무휴 · 누르면 바로 업체로 나갑니다 · ${배달날()} 받음</p>`;
+}
+function 미리보기(){
+  const ms=문자들(); if(!ms.length) return;
+  openSheet(`<h2>이렇게 보냅니다</h2>${ms.map(m=>`<div class="list" style="margin-bottom:10px"><div class="row"><span class="main"><b>${m.emoji} ${esc(m.supplier)}</b><span class="sub" style="white-space:pre-line">${esc(m.body)}</span></span></div></div>`).join('')}
+    <button class="big-btn" data-act="fsend">보내기</button><button class="big-btn sec" data-act="close">더 담기</button>`);
+}
+async function 보내기(b){
+  const ms=문자들(); if(!ms.length) return; const sig='food:'+ms.map(m=>m.body).join('|');
+  if(recentSame(sig)){ closeSheet(); toast('방금 똑같은 발주가 이미 나갔습니다'); return; }
+  b.disabled=true; markSent(sig);
+  // ⚠️ 답장을 기다리지 않음 (no-cors) — 기다리다 「실패」를 보고 또 누르면 문자가 두 번 감 (9/17 주류 6통 사고)
+  API.post(STORE.orderGas,{type:'food_order',branch:'wondang',delay_to_tuesday:false,messages:ms.map(m=>({supplier:m.supplier,phone:'',body:m.body,channel:'SMS',items:m.items}))}).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다'));
+  const t=hhmm(); ms.forEach(m=>{ S.food.sent[m.supplier]=t; SUPS.find(s=>s.key===m.supplier).items.forEach(i=>delete S.food.cart[m.supplier+':'+i]); });
+  save(); closeSheet(); rerender(); toast(`📨 ${ms.map(m=>m.supplier).join('·')} 발주 보냄`);
+}
+
+/* ══════════════ 🧽 청소 체크 ══════════════
+   서버 = 마감 GAS 「월간」 (branch wondang) — 두 폰이 같은 체크를 봄
+   한 달 = 이번 달 · 3달 = 1~3 · 4~6 · 7~9 · 10~12월 묶음 중 아무 달에 체크하면 끝 */
+const 분기달 = (()=>{ const y=+MONTH_KEY.slice(0,4), m=+MONTH_KEY.slice(5); const s=Math.floor((m-1)/3)*3+1; return [s,s+1,s+2].filter(x=>x<=m).map(x=>`${y}-${String(x).padStart(2,'0')}`); })();
+let CL = (()=>{ try{ return JSON.parse(localStorage.getItem('wondang-clean')||'null')||{}; }catch(e){ return {}; } })();   // {월: {id: {checked,date}}}
+async function loadClean(){
+  if(!LIVE) return;
+  const rs=await Promise.all(분기달.map(m=>API.jsonp(STORE.closeGas,{action:'monthly',month:m,branch:STORE.branch})));
+  let ok=false; rs.forEach((r,i)=>{ if(r&&r.checks){ CL[분기달[i]]=r.checks; ok=true; } });
+  if(ok){ try{ localStorage.setItem('wondang-clean',JSON.stringify(CL)); }catch(e){} if(cur==='t-clean') rClean(); }
+}
+function 체크(id, every){ const ms = every===3 ? 분기달 : [MONTH_KEY]; for(const m of ms){ const c=(CL[m]||{})[id]; if(c&&c.checked) return {...c, month:m}; } return null; }
+function rClean(){
+  const 끝=x=>x.subs?x.subs.every(([sid])=>체크(sid,x.every)):!!체크(x.id,x.every);
+  const 전체=CLEAN.flatMap(z=>z.items), 남음=전체.filter(x=>!끝(x)).length;
+  const 칸=(id,label,every)=>{ const c=체크(id,every); return `<button class="row ${c?'on-check':''}" data-act="cl" data-id="${id}" data-every="${every}" data-label="${esc(label)}"><span class="check">✓</span><span class="main">${esc(label)}${c?`<span class="sub">${esc(String(c.date||'').slice(5).replace('-','/'))} 끝</span>`:''}</span></button>`; };
+  const 카드=x=>{ const 됨=끝(x), 몇=x.subs?x.subs.filter(([sid])=>체크(sid,x.every)).length:0;
+    const 꼬리=`<span class="tag" style="background:${x.color}22;color:${x.color}">${x.every===3?'3달마다':'한 달에 한 번'}</span>`;
+    return x.subs
+      ? `<details class="cl-card" style="--c:${x.color}" ${됨?'':'open'}><summary><span class="main"><b>${됨?'✅ ':''}${esc(x.label)}</b><span class="sub">${몇}/${x.subs.length} 끝</span></span>${꼬리}</summary><div class="list">${x.subs.map(([sid,sl])=>칸(sid,x.label+' · '+sl,x.every)).join('')}</div></details>`
+      : `<div class="cl-card" style="--c:${x.color}"><div class="list">${칸(x.id,x.label,x.every).replace('</span></button>',`</span>${꼬리}</button>`)}</div></div>`; };
+  const 알림켬 = (()=>{ try{ return localStorage.getItem('store-push-on')==='1'; }catch(e){ return false; } })();
+  $('#t-clean').innerHTML = `
+    <div class="banner ${남음?'warn':'green'}"><span class="em">${남음?'🧽':'✨'}</span><div><b>${남음?`이번에 남은 청소 ${남음}개`:'이번 달 청소 끝!'}</b><span>${+MONTH_KEY.slice(5)}월 · 끝내고 체크하면 사장님께 알림이 갑니다</span></div></div>
+    ${CLEAN.map(z=>`<h2>${z.zone}</h2>${z.items.map(카드).join('')}`).join('')}
+    ${알림켬?'':`<button class="big-btn sec" data-act="pushon">🔔 이 폰에 알림 켜기 (매주 남은 청소 알려 줌)</button>`}`;
+}
+async function 청소누름(b){
+  const id=b.dataset.id, every=+b.dataset.every, label=b.dataset.label, c=체크(id,every), on=!c;
+  const m = c ? c.month : MONTH_KEY;
+  if(c && !confirm(`「${label}」 체크를 풀까요?`)) return;
+  CL[m]=CL[m]||{}; CL[m][id]={checked:on,date:BD_KEY,at:hhmm()}; try{ localStorage.setItem('wondang-clean',JSON.stringify(CL)); }catch(e){}
+  rClean(); toast(on?`✓ ${label}`:'체크를 풀었습니다');
+  API.post(STORE.closeGas,{action:'toggleMonthly',month:m,itemId:id,checked:on,branch:STORE.branch}).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다'));
+  // 🔔 사장님 「청소하고 체크하면 통합앱 사장에서 알림이 감」 — 사장앱만 (직원 폰엔 안 보냄)
+  if(on && LIVE) fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'clean',device:DEVICE,day:BD_KEY,item:id,label})}).catch(()=>{});
+  setTimeout(loadClean,4000);
+}
+async function turnPushOn(){
+  try{
+    const perm=await Notification.requestPermission(); if(perm!=='granted'){ toast('알림이 허용되지 않았습니다'); return; }
+    const k=await (await fetch(STORE.pushApi+'?a=vapid')).json(); if(!k.key){ toast('알림 서버가 아직 준비 안 됐습니다'); return; }
+    const reg=await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(k.key)});
+    const r=await fetch(STORE.pushApi+'?a=staffsub',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:STORE.code,sub:sub.toJSON(),device:DEVICE})});
+    if(!r.ok) throw new Error('등록 실패');
+    try{ localStorage.setItem('store-push-on','1'); }catch(e){}
+    toast('알림을 켰습니다'); rerender();
+  }catch(e){ toast('알림을 못 켰습니다 · '+e.message); }
+}
+
+/* ══════════════ 🧾 영수증 — 백석 매장앱 것 그대로 (26-10-18 사장님 「백석 영수증 분석기처럼」) ══════════════ */
+const R = { doc:'', dir:'', queue:[], running:false, amt:'', date:BD_KEY, memo:'' };
+const demoHashes = new Set();
+function rRcpt(){
+  const qIcon=st=>({'준비중':'…','대기':'🕐','업로드중':'⏳','확인중':'🔄','완료':'✅','이미있음':'♻️','확인못함':'⚠️','오류':'❌'}[st]);
+  const waiting=R.queue.filter(q=>q.status==='대기'&&q.b64).length, 준비=R.queue.filter(q=>q.status==='준비중').length;
+  $('#t-rcpt').innerHTML = 영수증실패띠() + `
+    ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
+    <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. 여러 장도 됩니다.</p>
+    <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
+    ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}${q.status==='오류'&&q.b64&&!R.running?`<button class="icon-btn" data-act="rretry" data-i="${i}">다시</button>`:''}</div>`).join('')}</div>
+      <button class="big-btn" data-act="rsubmit" ${(waiting||준비)&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
+
+    <h2>② 금액만 적을 것</h2><p class="hint">영수증 없이 금액만 넣는 것들입니다.</p>
+    <div class="doc-grid">${DIRECT_TYPES.map(([v,e,l,s])=>`<button class="doc" data-act="rdir" data-v="${v}" aria-pressed="${R.dir===v}"><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</button>`).join('')}</div>
+    <div class="fields"><input class="field num" id="rAmt" inputmode="numeric" placeholder="금액 (원)" value="${R.amt}"><input class="field" id="rDate" type="date" value="${R.date}"></div>
+    <input class="field" id="rMemo" placeholder="메모 (선택)" value="${esc(R.memo)}" style="margin-top:8px">
+    <button class="big-btn" data-act="rdirect" id="rDirBtn" ${R.dir&&numAmt()>0&&R.date?'':'disabled'}>기록하기</button>`;
+}
+const numAmt=()=>parseInt((R.amt||'').replace(/[^0-9]/g,'')||'0',10);
+async function fingerprint(file){
+  try{ const d=await crypto.subtle.digest('SHA-256',await file.arrayBuffer()); return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''); }catch(e){ return ''; }
+}
+/* 사진 줄이기 — createImageBitmap 이 되면 그걸로 (폰에서 몇 배 빠르고 메모리를 덜 씀) */
+async function shrink(file){
+  if(window.createImageBitmap){
+    try{
+      // ⚠️ 26-10-03 사진 줄이기가 끝나지 않고 멈춘 적이 있음 (화면이 뒤로 갔을 때) → 3초 넘으면 옛 방식으로
+      const bm=await Promise.race([createImageBitmap(file,{imageOrientation:'from-image'}), new Promise((_,no)=>setTimeout(()=>no(new Error('느림')),3000))]);
+      let w=bm.width,h=bm.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
+      const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(bm,0,0,w,h); bm.close&&bm.close();
+      const url=c.toDataURL('image/jpeg',0.85); const t=document.createElement('canvas'); const sc=120/Math.max(w,h); t.width=w*sc;t.height=h*sc; t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+      c.width=c.height=0;
+      return {b64:url.split(',')[1], thumb:t.toDataURL('image/jpeg',0.7)};
+    }catch(e){ /* 안 되면 아래 옛 방식 */ }
+  }
+  return Promise.race([shrinkOld(file), new Promise((_,no)=>setTimeout(()=>no(new Error('사진 읽기 시간 초과')),15000))]);
+}
+function shrinkOld(file){
+  return new Promise((ok,no)=>{ const r=new FileReader(); r.onerror=no; r.onload=e=>{ const img=new Image(); img.onerror=no; img.onload=()=>{
+    let w=img.width,h=img.height; const M=1600; if(w>M||h>M){ if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;} }
+    const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+    const url=c.toDataURL('image/jpeg',0.85); const t=document.createElement('canvas'); const s=120/Math.max(w,h); t.width=w*s;t.height=h*s; t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+    ok({b64:url.split(',')[1], thumb:t.toDataURL('image/jpeg',0.7)}); }; img.src=e.target.result; }; r.readAsDataURL(file); });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+/* 🔴 되묻는 간격 (26-10-01 고침)
+   전에는 2.5초 + 3.5초 = 6초만 기다렸습니다. 그런데 서버가 하는 일이
+   시트 읽기 → 파일 만들기 → 시트 쓰기로 4~8초입니다.
+   그래서 잘 들어갔는데도 「확인 못 했습니다」가 떴습니다.
+   ⚠️ 대부분 첫 3초에 끝납니다. 안 끝났을 때만 더 기다립니다. */
+/* ⚠️ 26-10-02 다시 고침 — 「영수증 분석기가 너무 느림 · 드라이브엔 금방 들어가는데 웹앱은 오래 걸리고 실패처럼 뜸」
+   한 장마다  ① 전에 올렸나 묻기(2~5초) → ② 올리기(4~8초) → ③ 3초 쉬고 되묻기  를 **한 장씩 차례로** 했습니다.
+   → ① 은 사진을 고를 때 미리 묻습니다 (미리확인)
+   → ② 는 두 장씩 같이 올립니다. 서버가 잠금을 걸어 같은 사진 두 번 저장은 막습니다
+   → ③ 은 기다리지 않고 바로 묻습니다. 올리기가 끝났다는 건 서버 일이 끝났다는 뜻입니다 (no-cors 도 답이 올 때까지 기다림)
+   → 끝까지 안 보여도 「안 들어갔습니다」라고 하지 않습니다. 「확인 중」으로 두고 30초 · 1분 · 2분 뒤에 다시 봅니다
+      ⚠️ 거짓 실패를 보면 사람이 또 올립니다 (문자 6통 사고와 같은 병) */
+/* 🔴 26-10-03 사장님: 「너무 오래 걸려 · 드라이브에 안 올라가거나 실패한 적이 없는 것 같은데 무조건 완료 뜨게 하면?」
+   → 보내기가 끝나면 **바로 ✅**. 「들어갔나」 확인은 화면을 막지 않고 뒤에서 합니다.
+   ⚠️ 그래도 확인은 계속합니다 — 확인을 없애면 진짜 안 들어간 날 아무도 모르고 손익이 비게 됩니다 (조용한 실패)
+      확인 대기 목록은 폰에 저장(rcpt-pending) → 앱을 닫았다 열어도 이어서 확인
+      10분이 지나도 서버에 없으면 그때만 「⚠️ N장이 안 들어갔습니다」 띠를 띄움 (오늘·영수증 화면) */
+const PENDING='rcpt-pending-'+STORE.code, FAILED='rcpt-failed-'+STORE.code;
+const lsGet=(k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v.slice(-60))); }catch(e){} };
+let 확인중=false;
+async function 뒤확인(){
+  if(확인중||!API.RECEIPT_LIVE) return; 확인중=true;
+  try{
+    const now=Date.now(), keep=[], fail=lsGet(FAILED);
+    for(const p of lsGet(PENDING)){
+      if(now-p.at<20000){ keep.push(p); continue; }
+      const got=await API.photoExists(p.hash);
+      if(got) continue;                                    // 들어갔다
+      if(got===null && now-p.at>10*60e3){ fail.push(p); continue; }   // 10분이 지나도 없음 → 실패로
+      if(now-p.at<24*3600e3) keep.push(p);                 // 못 물어봤으면 계속 (하루까지)
+    }
+    lsSet(PENDING,keep); const 새실패=fail.length!==lsGet(FAILED).length; lsSet(FAILED,fail);
+    if(새실패) rerender();
+  }finally{ 확인중=false; }
+}
+function 영수증실패띠(){
+  const f=lsGet(FAILED); if(!f.length) return '';
+  return `<div class="banner red"><span class="em">⚠️</span><div><b>영수증 ${f.length}장이 안 들어갔습니다</b><span>${f.slice(-3).map(x=>esc(x.when+' '+x.label)).join(' · ')} — 사진첩에서 다시 올려 주세요 (다시 올려도 중복 안 됨)</span></div><button class="icon-btn" data-act="rfailok" aria-label="확인">확인</button></div>`;
+}
+/* 「전에 올린 사진인가」 — 사진을 고를 때 미리 물어 둡니다 (보낼 때 기다리지 않게)
+   ⚠️ 26-10-03 영수증 고치다 이 함수를 같이 지워 사진이 「준비 중」에서 멈춤 — 지우지 말 것 */
+async function 미리확인(q){
+  try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
+  if(q.status!=='대기' && q.status!=='준비중') return;
+  const before = await API.photoExists(q.hash);
+  if(before && (q.status==='대기'||q.status==='준비중')){ q.status='이미있음'; q.err='전에 올린 사진입니다'+(before.시각?` (${before.시각})`:''); q.b64=null; if(cur==='t-rcpt') rerender(); }
+}
+async function 한장(q){
+  q.status='업로드중'; rerender();
+  try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
+  try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷이 끊겼습니다 — 「다시」를 눌러 주세요'; rerender(); return; }
+  q.status='완료'; q.err=''; q.b64=null; rerender();          // ✅ 바로
+  if(q.hash){ const l=lsGet(PENDING); l.push({hash:q.hash, at:Date.now(), when:hhmm(), label:(DOC_TYPES.find(d=>d[0]===q.docType)||['','',''])[2]}); lsSet(PENDING,l); }
+}
+async function runQueue(){
+  R.autoSend = true;   // 아직 준비 중인 사진도 준비되면 바로 보냄
+  if(R.running) return;
+  R.running=true; rerender();
+  const 할것=()=>R.queue.find(q=>q.status==='대기'&&q.b64);
+  const 일꾼=async()=>{ let q; while((q=할것())) await 한장(q); };
+  await Promise.all([일꾼(),일꾼()]);   // 두 장씩
+  R.running=false; rerender();
+  const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`✅ 영수증 ${n}장 보냄. 새벽에 자동 분석됩니다`);
+  if(!R.queue.some(q=>q.status==='준비중')) R.autoSend=false;
+  setTimeout(뒤확인,25000);
+}
+
+
+/* ── 누르기 ── */
+document.addEventListener('click', async e=>{
+  const b=e.target.closest('button,[data-act]'); if(!b) return;
+  if(b.dataset.tab){ go(b.dataset.tab); return; }
+  switch(b.dataset.act){
+    case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
+    case 'fq': { const k=b.dataset.k, n=Math.max(0,(S.food.cart[k]||0)+(+b.dataset.d)); if(n) S.food.cart[k]=n; else delete S.food.cart[k]; save(); rerender(); break; }
+    case 'fpreview': 미리보기(); break;
+    case 'fsend': 보내기(b); break;
+    case 'cl': 청소누름(b); break;
+    case 'pushon': turnPushOn(); break;
+    case 'close': closeSheet(); break;
+    case 'rdel': R.queue.splice(+b.dataset.i,1); rerender(); break;
+    case 'rretry': { const q=R.queue[+b.dataset.i]; if(q){ q.status='대기'; q.err=''; } runQueue(); break; }
+    case 'rfailok': lsSet(FAILED,[]); rerender(); break;
+    case 'rsubmit': runQueue(); break;
+    case 'rdir': R.dir=b.dataset.v; R.memo=''; rerender(); break;
+    case 'rdirect': { const amt=numAmt(); if(!(R.dir&&amt>0&&R.date)||b.disabled) break; b.disabled=true;
+      const dir=R.dir, date=R.date, memo=R.memo, sig='direct:'+[dir,amt,date,memo].join('|');
+      if(recentSame(sig) && !confirm(`방금 ${dir} ${won(amt)}을 기록했습니다. 정말 또 기록할까요?`)){ b.disabled=false; break; }
+      markSent(sig);
+      R.dir='';R.amt='';R.memo=''; rerender(); toast(`기록함 · ${dir} ${won(amt)}`);
+      API.direct(dir,amt,date,memo).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다'));
+      break; }
+  }
+});
+document.addEventListener('change', async e=>{
+  if(e.target.dataset.act!=='rcpt') return;
+  R.doc = e.target.dataset.v;
+  const files=[...e.target.files]; e.target.value='';
+  /* ⚠️ 26-10-02 「사진 찍고 바로바로 안 뜸 · 올릴 목록이 뜰 때 있고 안 뜰 때 있음」
+     전에는 사진을 다 줄인 뒤에야 목록에 넣었습니다. 큰 사진은 줄이는 데 1~3초 → 그동안 아무것도 안 보임.
+     → 먼저 「준비 중」으로 목록에 넣고, 줄이기는 뒤에서 하나씩. 지문·「전에 올렸나」도 이때 미리 물어 둡니다 */
+  const 새것 = files.map(f=>({docType:R.doc,fname:f.name,file:f,b64:null,thumb:'',hash:fingerprint(f),status:'준비중'}));
+  R.queue.push(...새것); rerender();
+  for(const q of 새것){
+    try{ const {b64,thumb}=await shrink(q.file); q.b64=b64; q.thumb=thumb; if(q.status==='준비중') q.status='대기'; }
+    catch(err){ q.status='오류'; q.err='사진을 읽지 못했습니다. 다시 찍어 주세요'; }
+    q.file=null; if(cur==='t-rcpt') rerender();
+    미리확인(q);
+    if(R.autoSend && q.status==='대기') runQueue();   // 「모두 제출」을 이미 눌렀으면 준비되는 대로 보냄
+  }
+});
+document.addEventListener('input', e=>{
+  if(e.target.id==='rAmt'){ const el=e.target, back=el.value.length-el.selectionStart, n=el.value.replace(/[^0-9]/g,'');
+    el.value=n?Number(n).toLocaleString('ko-KR'):''; R.amt=el.value; const p=Math.max(0,el.value.length-back); try{el.setSelectionRange(p,p);}catch(_){}
+    $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
+  if(e.target.id==='rDate'){ R.date=e.target.value; $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
+  if(e.target.id==='rMemo'){ R.memo=e.target.value; }
+});
+
+/* ── 시작 ── */
+$('#dateLabel').textContent=`원당점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[BD.getDay()]}요일 · ${APP_VERSION}`;
+if(LIVE) $('#modePill').hidden=true;
+go('t-food');
+if(LIVE){ loadClean(); setTimeout(뒤확인,8000); setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
+  setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(k!==BD_KEY) location.reload(); },60000); }
+</script>
+</body>
+</html>
