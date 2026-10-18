@@ -247,7 +247,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-16-v24';
+const APP_VERSION = '2026-10-18-v25';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -764,6 +764,7 @@ function rFood(){
     ${휴무줄()}
     ${monTue?`<div class="banner warn"><span class="em">⚠️</span><div><b>월·화 발주 — 화요일 저녁 자동 발송</b><span>화요일 20:30에 업체로 나가고 수요일 납품. 월요일 14시 전 발주는 바로 나갑니다</span></div></div>`:''}
     ${나간업체.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 넣은 발주</b><span>${나간업체.map(k=>`${supOf(k).emoji} ${k} ${sentOf(k)}`).join(' · ')}</span></div></div>`:''}
+    ${(f.reserved||[]).map(x=>`<div class="banner warn"><span class="em">📦</span><div><b>${esc(x.supplier)} 이미 예약됨 · ${esc(x.when)} 나감</b><span>${x.items.map(i=>esc(i.item)+(i.qty?' '+esc(i.qty):'')).join(', ')}<br>또 넣으면 합쳐서 한 번에 갑니다 — 위 품목은 다시 담지 마세요</span></div></div>`).join('')}
     ${f.sent?`<div class="banner green"><span class="em">✅</span><div><b>${String(f.sent).includes('예약')?f.sent+' — 이 폰에서 넣음':f.sent+' 이 폰에서 보냄'}</b><span>더 담아서 또 보내도 됩니다</span></div></div>`:''}
     ${daepa>=STORE.daepaKimchiOver?`<div class="banner green"><span class="em">🥬</span><div><b>대파 ${daepa}단</b><span>납품일이 「대파김치 하는 날」로 오늘 화면에 뜹니다</span></div></div>`:''}
     ${f.fromClose?`<p class="hint">마감체크에서 담은 ${f.fromClose}개가 들어 있어요.</p>`:''}
@@ -1004,7 +1005,7 @@ async function readCart(force){
   (r.items||[]).forEach(b=>{ if(b.supplier==='주류') return; const k=b.supplier+':'+b.item, q=parseFloat(b.qty);
     const c=cart[k]||{on:true,qty:''}; if(isFinite(q)) c.qty=(parseFloat(c.qty)||0)+q; cart[k]=c; if(b.src) srcs[b.src]=true; });
   Object.keys(S.food.cart).forEach(k=>{ if(k.startsWith('주류:')) cart[k]=S.food.cart[k]; });
-  S.food.cart=cart; S.food.srcs=srcs; S.food.sentSups=r.sent||{}; applyLiquor(r.liquor); save();
+  S.food.cart=cart; S.food.srcs=srcs; S.food.sentSups=r.sent||{}; S.food.reserved=r.reserved||[];   /* 📦 26-10-18 아직 안 나간 예약 (토요일에 넣은 것 등) */ applyLiquor(r.liquor); save();
   if(cur==='t-food'||cur==='t-close') rerender();
 }
 /* 🥩 오늘 고기 발주·입고가 나갔나 — **서버(시트)가 진실** (26-10-01)
