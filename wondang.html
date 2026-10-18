@@ -251,7 +251,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-18-w1';
+const APP_VERSION = '2026-10-18-w2';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -282,6 +282,12 @@ const CLEAN = [
     { id:'w_window', label:'창문 · 창틀', every:1, color:'#0AA5A5' },
   ]},
 ];
+/* 📷 하루 3장까지 (26-10-18 사장님 「앞으로는 하루에 4개 밑으로 올릴 수 있게」)
+   이유: 손익 GAS 새벽 분석이 5분 안에 원당·백석을 같이 · 한 장 1분쯤 → 하룻밤 4~5장. 많이 올리면 며칠 밀려 「안 들어간 것」처럼 보였음 (10/17·18 8장)
+   ⚠️ 이 폰에서 센 것 (두 폰이면 각각 3장) · 금액만 적는 것은 안 셈 */
+const 하루한도 = 3;
+const 오늘장수 = ()=>{ try{ return +localStorage.getItem('wondang-photos-'+BD_KEY)||0; }catch(e){ return 0; } };
+const 장수더하기 = ()=>{ try{ localStorage.setItem('wondang-photos-'+BD_KEY, 오늘장수()+1); }catch(e){} };
 const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락',''],['관리비','⚡','매장관리비','전기 명세서']];
 const DIRECT_TYPES = [['배달매출','🛵','배달매출','월 1회'],['가게내부카드','💳','가게내부카드','월 합계'],['가게외부카드','🛒','가게외부카드','인터넷 주문'],['콩나물','🌾','콩나물',''],['키위','🥝','키위','보성'],['매장관리비','💧','매장관리비','수도 · 숫자'],['기타세금','🧾','기타세금',''],['기타잡비용','🧰','기타잡비용','']];
 /* ⚠️ 계정 이름은 원당 손익 그대로 (백석은 「가게카드」 · 원당은 「가게내부카드」「가게외부카드」 — 문서/10_복제_와꾸.md 6번) */
@@ -440,7 +446,7 @@ function rRcpt(){
   const waiting=R.queue.filter(q=>q.status==='대기'&&q.b64).length, 준비=R.queue.filter(q=>q.status==='준비중').length;
   $('#t-rcpt').innerHTML = 영수증실패띠() + `
     ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
-    <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. 여러 장도 됩니다.</p>
+    <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. <b>하루 ${하루한도}장까지</b> (오늘 ${오늘장수()}장 올림) — 새벽 분석이 하룻밤에 몇 장만 할 수 있어서입니다.</p>
     <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
     ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}${q.status==='오류'&&q.b64&&!R.running?`<button class="icon-btn" data-act="rretry" data-i="${i}">다시</button>`:''}</div>`).join('')}</div>
       <button class="big-btn" data-act="rsubmit" ${(waiting||준비)&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
@@ -530,7 +536,7 @@ async function 한장(q){
   q.status='업로드중'; rerender();
   try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
   try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷이 끊겼습니다 — 「다시」를 눌러 주세요'; rerender(); return; }
-  q.status='완료'; q.err=''; q.b64=null; rerender();          // ✅ 바로
+  q.status='완료'; q.err=''; q.b64=null; 장수더하기(); rerender();          // ✅ 바로
   if(q.hash){ const l=lsGet(PENDING); l.push({hash:q.hash, at:Date.now(), when:hhmm(), label:(DOC_TYPES.find(d=>d[0]===q.docType)||['','',''])[2]}); lsSet(PENDING,l); }
 }
 async function runQueue(){
@@ -576,7 +582,9 @@ document.addEventListener('click', async e=>{
 document.addEventListener('change', async e=>{
   if(e.target.dataset.act!=='rcpt') return;
   R.doc = e.target.dataset.v;
-  const files=[...e.target.files]; e.target.value='';
+  let files=[...e.target.files]; e.target.value='';
+  const 남은 = 하루한도 - 오늘장수() - R.queue.filter(q=>['준비중','대기','업로드중'].includes(q.status)).length;
+  if(files.length>남은){ files=files.slice(0,Math.max(0,남은)); toast(남은>0?`오늘은 ${하루한도}장까지 · ${남은}장만 넣었습니다. 나머지는 내일 올려 주세요`:`오늘은 ${하루한도}장을 다 올렸습니다. 나머지는 내일 올려 주세요`); if(!files.length) return; }
   /* ⚠️ 26-10-02 「사진 찍고 바로바로 안 뜸 · 올릴 목록이 뜰 때 있고 안 뜰 때 있음」
      전에는 사진을 다 줄인 뒤에야 목록에 넣었습니다. 큰 사진은 줄이는 데 1~3초 → 그동안 아무것도 안 보임.
      → 먼저 「준비 중」으로 목록에 넣고, 줄이기는 뒤에서 하나씩. 지문·「전에 올렸나」도 이때 미리 물어 둡니다 */
