@@ -217,6 +217,23 @@ nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:
 
 button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* 🧾 영수증 올리는 동안 (26-10-23 사장님 「영수증 올릴 때 애니메이션 넣어서 잠시 대기 · 재밌는 느낌으로」)
+   다 올라갈 때까지 화면을 붙잡아 둠 — 아이폰은 앱을 내리면 올리기가 멈춤 · transform/opacity 만 움직임 */
+#upOv{position:fixed;inset:0;z-index:80;background:color-mix(in srgb,var(--paper) 94%,transparent);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+#upOv.show{display:flex}
+.up-sky{position:relative;width:220px;height:200px}
+.up-cloud{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:64px;animation:upBob 2.2s ease-in-out infinite}
+.up-rc{position:absolute;left:50%;bottom:0;width:46px;height:58px;margin-left:-23px;border-radius:4px;background:#fff;box-shadow:0 3px 10px #0002;opacity:0;animation:upFly 1.8s cubic-bezier(.3,.6,.4,1) infinite}
+.up-rc::before{content:"";position:absolute;left:8px;right:8px;top:10px;height:30px;background:repeating-linear-gradient(#cfd6db 0 3px,transparent 3px 8px)}
+.up-rc::after{content:"₩";position:absolute;right:6px;bottom:3px;font-size:12px;font-weight:900;color:var(--accent)}
+.up-rc:nth-child(3){animation-delay:.6s;--r:14deg}.up-rc:nth-child(4){animation-delay:1.2s;--r:-12deg}
+@keyframes upFly{0%{opacity:0;transform:translateY(0) rotate(0) scale(.8)}15%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(-140px) rotate(var(--r,6deg)) scale(.35)}}
+@keyframes upBob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-6px)}}
+#upOv b{font-size:19px;margin-top:6px}#upOv .up-t{color:var(--muted);font-size:14px;margin-top:6px;min-height:20px}
+.up-bar{width:220px;height:8px;border-radius:9px;background:var(--line);margin-top:14px;overflow:hidden}.up-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+#upOv .up-warn{margin-top:14px;font-size:13px;font-weight:700;color:var(--beef)}
+@media (prefers-reduced-motion:reduce){.up-rc,.up-cloud{animation:none}}
 </style>
 </head>
 <body>
@@ -236,6 +253,8 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 <nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
 <div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<div id="upOv" role="status" aria-live="polite"><div class="up-sky"><span class="up-cloud">☁️</span><i class="up-rc"></i><i class="up-rc"></i><i class="up-rc"></i></div><b id="upN">영수증 택배 출발!</b><div class="up-t" id="upT"></div><div class="up-bar"><i id="upBar"></i></div><div class="up-warn" id="upW">📵 다 올라갈 때까지 화면을 끄지 마세요</div></div>
+
 <button class="newver" id="newver" type="button">🔄 새 버전이 나왔어요 · 눌러서 새로고침</button>
 
 <script>
@@ -247,7 +266,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-18-v26';
+const APP_VERSION = '2026-10-23-v27';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -280,7 +299,9 @@ const STORE = {
    ⚠️ 첫 칸(분류)이 지출및매출로그 B열에 그대로 들어갑니다. 시트는 B열 글자가 라벨과 똑같아야 SUMIFS 로 잡습니다
       괄호 하나만 붙어도 손익에서 조용히 빠집니다 (예: 매장관리비(전기,수도)) */
 const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락','']];
-const DIRECT_TYPES = [['가게카드','💳','가게카드',''],['콩나물','🌾','콩나물',''],['매장관리비','🏢','매장관리비','전기·수도'],['가스사용료','🔥','가스사용료',''],['광고비','📣','광고비',''],['기타세금','🧾','기타세금','지방세·등록세'],['기타잡비용','🧰','기타잡비용','수리·소모품']];
+/* 🥤 26-10-23 사장님 「음료원가 맞아. 영수증분석기에만 음료수로」 — 버튼 글자는 「음료수」, 손익 계정은 「음료원가」
+   ⚠️ 발주앱으로 시킨 음료수(콜라·사이다…)는 새벽에 자동으로 음료원가에 들어감 → 여기는 앱 밖에서 산 것만 (두 번 들어가지 않게) */
+const DIRECT_TYPES = [['가게카드','💳','가게카드',''],['콩나물','🌾','콩나물',''],['매장관리비','🏢','매장관리비','전기·수도'],['가스사용료','🔥','가스사용료',''],['광고비','📣','광고비',''],['음료원가','🥤','음료수','앱 밖에서 산 것'],['기타세금','🧾','기타세금','지방세·등록세'],['기타잡비용','🧰','기타잡비용','수리·소모품']];
 
 /* ── 품목 데이터 (기존 앱과 똑같이 유지) ── */
 const MEAT_EXTRAS = ['벌집양','천엽','간','간(반)','내장'];
@@ -562,7 +583,7 @@ function rToday(){
     Y.meatIn==null ? null
       : noMeatIn ? ['🥩','오늘은 고기 입고 없음', closedToday?'월요일 발주는 수요일 화면에 뜹니다':'']
       : Y.meatIn.length ? ['🥩','오늘 들어오는 고기', Y.meatIn.join(', ')] : ['🥩','오늘 들어오는 고기 없음',''],
-    daepaDay && !closedToday ? ['🥬','대파김치 하는 날', `${전날말} 대파 ${Y.daepa}단 주문`] : null,
+    daepaDay && !closedToday ? ['🥬','대파김치 하는 날 · 눌러서 양념 계산', `${전날말} 대파 ${Y.daepa}단 주문`, 'daepa'] : null,
     noMeat ? ['🚫','고기 발주 없는 날', ''] : null,
     closedToday ? ['💤','휴무일', '발주는 저장만 되고 저녁에 자동 발송'] : null,
     /* 📅 26-10-07 사장님: 「대시보드에 업체 휴무일이 있을 경우 미리 알려줘야 … 대략 5일 전부터 … 휴무일이 끝났을 때 같이 없어지면」
@@ -574,7 +595,7 @@ function rToday(){
   el.innerHTML = notifyBanner() + 영수증실패띠() + `
     ${todayRows.length?`<div class="today">
       <div class="today-h">오늘은</div>
-      ${todayRows.map(([em,t,sub])=>`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
+      ${todayRows.map(([em,t,sub,act])=>act?`<button class="today-r" data-act="${act}" style="width:100%;text-align:left;color:inherit"><span class="em">${em}</span><div style="flex:1"><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div><span style="font-size:20px">🧮</span></button>`:`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
     </div>`:''}
     <h2>오늘 할 일</h2>
     <p class="hint">위에서부터 하면 됩니다.</p>
@@ -1152,20 +1173,68 @@ async function 한장(q){
   q.status='업로드중'; rerender();
   try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
   try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷이 끊겼습니다 — 「다시」를 눌러 주세요'; rerender(); return; }
-  q.status='완료'; q.err=''; q.b64=null; rerender();          // ✅ 바로
+  q.status='완료'; q.err=''; q.b64=null; 올림갱신(); rerender();          // ✅ 바로
   if(q.hash){ const l=lsGet(PENDING); l.push({hash:q.hash, at:Date.now(), when:hhmm(), label:(DOC_TYPES.find(d=>d[0]===q.docType)||['','',''])[2]}); lsSet(PENDING,l); }
 }
+
+/* 🧾 올리는 동안 대기 화면 — 한마디가 돌아감 · 다 끝나면 「✅ 다 올라갔어요」 1초 뒤 닫힘 */
+const 올림말=['영수증이 사장님 장부로 날아가는 중…','숫자 하나하나 포장하는 중…','구글 창고에 차곡차곡 쌓는 중…','곱창 굽는 속도로 올리는 중…','새벽에 AI 가 읽어 줄 거예요…'];
+let 올림타이머=null;
+function 올림창(on){ const o=$('#upOv'); if(!o) return;
+  if(on){ o.classList.add('show'); let i=0; $('#upT').textContent=올림말[0]; clearInterval(올림타이머); 올림타이머=setInterval(()=>{ i=(i+1)%올림말.length; $('#upT').textContent=올림말[i]; },1700); 올림갱신(); }
+  else{ clearInterval(올림타이머); const n=R.queue.filter(q=>q.status==='완료').length;
+    $('#upN').textContent=n?`✅ 다 올라갔어요! (${n}장)`:'⚠️ 못 올라간 사진이 있어요'; $('#upT').textContent=n?'새벽에 자동으로 장부에 들어갑니다':'목록에서 「다시」를 눌러 주세요'; $('#upW').textContent=''; $('#upBar').style.width='100%';
+    setTimeout(()=>{ o.classList.remove('show'); $('#upW').textContent='📵 다 올라갈 때까지 화면을 끄지 마세요'; },1300); } }
+function 올림갱신(){ const o=$('#upOv'); if(!o||!o.classList.contains('show')) return;
+  const 할=R.queue.filter(q=>['대기','업로드중','준비중','완료'].includes(q.status)), 끝=할.filter(q=>q.status==='완료').length;
+  $('#upN').textContent=`영수증 택배 출발! ${끝}/${할.length}장`; $('#upBar').style.width=(할.length?끝/할.length*100:0)+'%'; }
 async function runQueue(){
   R.autoSend = true;   // 아직 준비 중인 사진도 준비되면 바로 보냄
   if(R.running) return;
-  R.running=true; rerender();
+  R.running=true; rerender(); 올림창(true);
   const 할것=()=>R.queue.find(q=>q.status==='대기'&&q.b64);
   const 일꾼=async()=>{ let q; while((q=할것())) await 한장(q); };
   await Promise.all([일꾼(),일꾼()]);   // 두 장씩
-  R.running=false; rerender();
+  R.running=false; rerender(); 올림창(false);
   const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`✅ 영수증 ${n}장 보냄. 새벽에 자동 분석됩니다`);
   if(!R.queue.some(q=>q.status==='준비중')) R.autoSend=false;
   setTimeout(뒤확인,25000);
+}
+
+/* ══════════════ 🥬 대파김치 양념 계산 (26-10-23) ══════════════
+   사장님: 「계산 산식이 어플에 껴져 있어야 해 · 전날 대파 발주 넣으면 오늘 대파김치 해야 한다고 올라가잖아. 그때 클릭해서 몇 그람인지 물어보고 바로 계산」
+   🔴 사장님이 준 배합 그대로 (바꾸면 여기만)
+      입력 = 큰 대야 + 일반저울 총무게 → 순 대파 = 총무게 − 3.6kg (대야 3,200g + 저울 오차 400g) · 「순 대파 무게」를 고르면 빼지 않음
+      숫자만 = kg · 「g」를 붙이거나 100 넘는 숫자 = g
+      순 대파 W kg 당: 굵은소금 0.8수저 · 고춧가루 50g · 백설탕 35g(옛 50g의 0.7배) · 매실액 50g · 까나리액젓 20g · 새우젓 20g · 간생강 0.2수저 · 미원 0.2수저
+      소수점은 그대로 (정수로 바꾸지 않음 · 소수 둘째 자리까지) */
+const 대야뺌 = 3.6;
+const 양념 = [['굵은소금',0.8,'수저'],['고춧가루',50,'g'],['백설탕',35,'g'],['매실액',50,'g'],['까나리액젓',20,'g'],['새우젓',20,'g'],['간생강',0.2,'수저'],['미원',0.2,'수저']];
+let 대파 = { 입력:'', 순:false };
+const 소수 = n=>String(Math.round(n*100)/100);
+function 대파계산(){
+  const t=String(대파.입력||'').trim().replace(/,/g,''); if(!t) return null;
+  const n=parseFloat(t); if(!isFinite(n)||n<=0) return {err:'숫자로 넣어 주세요'};
+  const kg = /g$/i.test(t)&&!/kg$/i.test(t) || n>100 ? n/1000 : n;
+  const W = 대파.순 ? kg : kg-대야뺌;
+  if(W<=0) return {err:`총무게가 ${대야뺌}kg(대야+저울 보정)보다 작습니다 — 순 대파 무게면 아래를 눌러 주세요`};
+  return {W, rows:양념.map(([이름,k,단위])=>[이름, 소수(W*k), 단위])};
+}
+function 대파창(){
+  const r=대파계산();
+  openSheet(`<h2>🥬 대파김치 양념 계산</h2>
+    <p class="hint">${대파.순?'<b>순 대파 무게</b>를 넣어 주세요':'큰 대야에 담아 <b>일반저울로 잰 총무게</b>를 넣어 주세요 (대야+보정 3.6kg 자동으로 뺌)'}</p>
+    <input class="field num" id="dpIn" inputmode="decimal" placeholder="예: 14 (kg) · 12500g" value="${esc(대파.입력)}" style="font-size:22px;text-align:right">
+    <button class="link-btn" data-act="dpNet" style="text-align:left;padding:8px 2px">${대파.순?'☑':'☐'} 순 대파 무게로 넣기 (대야 무게 안 뺌)</button>
+    <div id="dpOut">${대파결과(r)}</div>
+    <button class="big-btn sec" data-act="close">닫기</button>`);
+  setTimeout(()=>{ const i=$('#dpIn'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },60);
+}
+function 대파결과(r){
+  if(!r) return '<p class="hint" style="text-align:center;margin-top:10px">무게를 넣으면 바로 계산합니다</p>';
+  if(r.err) return `<div class="banner warn" style="margin-top:10px"><span class="em">⚠️</span><div><b>${esc(r.err)}</b></div></div>`;
+  return `<div class="today" style="margin-top:12px"><div class="today-h">순 대파</div><div class="num" style="font-size:30px;font-weight:800;padding:2px 0 8px">${소수(r.W)}kg</div></div>
+    <div class="list" style="margin-top:8px">${r.rows.map(([n,v,u])=>`<div class="row"><span class="main">${n}</span><b class="num" style="font-size:20px">${v}<small style="font-size:13px;font-weight:500;margin-left:2px">${u}</small></b></div>`).join('')}</div>`;
 }
 
 /* ══════════════ 숫자판 / 아래 판 ══════════════ */
@@ -1323,6 +1392,8 @@ document.addEventListener('click', async e=>{
 
     case 'guide': { const id=b.dataset.id; openSheet(`<h2>${esc(LABEL[id]||id)}</h2>${기준그리기(기준표&&기준표[id])}<button class="big-btn sec" data-act="close">닫기</button>`); break; }
 
+    case 'daepa': 대파창(); break;
+    case 'dpNet': 대파.순=!대파.순; 대파창(); break;
     case 'pushon': turnPushOn(); break;
     case 'close': closeSheet(); break;
     /* 📅 휴무 (26-10-07) — 사장님: 「업체 자체적으로 갑자기 쉬는 날, 혹은 가게에서 자체적으로 쉬는 날 … 넣을 수 있는 기능」
@@ -1364,6 +1435,7 @@ document.addEventListener('input', e=>{
   if(e.target.id==='rAmt'){ const el=e.target, back=el.value.length-el.selectionStart, n=el.value.replace(/[^0-9]/g,'');
     el.value=n?Number(n).toLocaleString('ko-KR'):''; R.amt=el.value; const p=Math.max(0,el.value.length-back); try{el.setSelectionRange(p,p);}catch(_){}
     $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
+  if(e.target.id==='dpIn'){ 대파.입력=e.target.value; const o=$('#dpOut'); if(o) o.innerHTML=대파결과(대파계산()); return; }
   if(e.target.id==='rDate'){ R.date=e.target.value; $('#rDirBtn').disabled=!(R.dir&&numAmt()>0&&R.date); }
   if(e.target.id==='rMemo'){ R.memo=e.target.value; }
 });

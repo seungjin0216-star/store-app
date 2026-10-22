@@ -227,6 +227,23 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 .cl-card summary::-webkit-details-marker{display:none}
 .cl-card summary .main{flex:1}.cl-card summary .sub{display:block;font-size:13px;color:var(--muted)}
 .cl-card details .row,.cl-card .row{background:transparent}
+
+/* 🧾 영수증 올리는 동안 (26-10-23 사장님 「영수증 올릴 때 애니메이션 넣어서 잠시 대기 · 재밌는 느낌으로」)
+   다 올라갈 때까지 화면을 붙잡아 둠 — 아이폰은 앱을 내리면 올리기가 멈춤 · transform/opacity 만 움직임 */
+#upOv{position:fixed;inset:0;z-index:80;background:color-mix(in srgb,var(--paper) 94%,transparent);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+#upOv.show{display:flex}
+.up-sky{position:relative;width:220px;height:200px}
+.up-cloud{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:64px;animation:upBob 2.2s ease-in-out infinite}
+.up-rc{position:absolute;left:50%;bottom:0;width:46px;height:58px;margin-left:-23px;border-radius:4px;background:#fff;box-shadow:0 3px 10px #0002;opacity:0;animation:upFly 1.8s cubic-bezier(.3,.6,.4,1) infinite}
+.up-rc::before{content:"";position:absolute;left:8px;right:8px;top:10px;height:30px;background:repeating-linear-gradient(#cfd6db 0 3px,transparent 3px 8px)}
+.up-rc::after{content:"₩";position:absolute;right:6px;bottom:3px;font-size:12px;font-weight:900;color:var(--accent)}
+.up-rc:nth-child(3){animation-delay:.6s;--r:14deg}.up-rc:nth-child(4){animation-delay:1.2s;--r:-12deg}
+@keyframes upFly{0%{opacity:0;transform:translateY(0) rotate(0) scale(.8)}15%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(-140px) rotate(var(--r,6deg)) scale(.35)}}
+@keyframes upBob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-6px)}}
+#upOv b{font-size:19px;margin-top:6px}#upOv .up-t{color:var(--muted);font-size:14px;margin-top:6px;min-height:20px}
+.up-bar{width:220px;height:8px;border-radius:9px;background:var(--line);margin-top:14px;overflow:hidden}.up-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+#upOv .up-warn{margin-top:14px;font-size:13px;font-weight:700;color:var(--beef)}
+@media (prefers-reduced-motion:reduce){.up-rc,.up-cloud{animation:none}}
 </style>
 </head>
 <body>
@@ -242,6 +259,8 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 <nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
 <div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<div id="upOv" role="status" aria-live="polite"><div class="up-sky"><span class="up-cloud">☁️</span><i class="up-rc"></i><i class="up-rc"></i><i class="up-rc"></i></div><b id="upN">영수증 택배 출발!</b><div class="up-t" id="upT"></div><div class="up-bar"><i id="upBar"></i></div><div class="up-warn" id="upW">📵 다 올라갈 때까지 화면을 끄지 마세요</div></div>
+
 
 <script>
 /* ══════════════════════════════════════════════════════════
@@ -251,7 +270,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-18-w2';
+const APP_VERSION = '2026-10-23-w3';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -536,17 +555,29 @@ async function 한장(q){
   q.status='업로드중'; rerender();
   try{ q.hash = await q.hash; }catch(e){ q.hash=''; }
   try{ await API.uploadPhoto(q); }catch(e){ q.status='오류'; q.err='인터넷이 끊겼습니다 — 「다시」를 눌러 주세요'; rerender(); return; }
-  q.status='완료'; q.err=''; q.b64=null; 장수더하기(); rerender();          // ✅ 바로
+  q.status='완료'; q.err=''; q.b64=null; 올림갱신(); 장수더하기(); rerender();          // ✅ 바로
   if(q.hash){ const l=lsGet(PENDING); l.push({hash:q.hash, at:Date.now(), when:hhmm(), label:(DOC_TYPES.find(d=>d[0]===q.docType)||['','',''])[2]}); lsSet(PENDING,l); }
 }
+
+/* 🧾 올리는 동안 대기 화면 — 한마디가 돌아감 · 다 끝나면 「✅ 다 올라갔어요」 1초 뒤 닫힘 */
+const 올림말=['영수증이 사장님 장부로 날아가는 중…','숫자 하나하나 포장하는 중…','구글 창고에 차곡차곡 쌓는 중…','곱창 굽는 속도로 올리는 중…','새벽에 AI 가 읽어 줄 거예요…'];
+let 올림타이머=null;
+function 올림창(on){ const o=$('#upOv'); if(!o) return;
+  if(on){ o.classList.add('show'); let i=0; $('#upT').textContent=올림말[0]; clearInterval(올림타이머); 올림타이머=setInterval(()=>{ i=(i+1)%올림말.length; $('#upT').textContent=올림말[i]; },1700); 올림갱신(); }
+  else{ clearInterval(올림타이머); const n=R.queue.filter(q=>q.status==='완료').length;
+    $('#upN').textContent=n?`✅ 다 올라갔어요! (${n}장)`:'⚠️ 못 올라간 사진이 있어요'; $('#upT').textContent=n?'새벽에 자동으로 장부에 들어갑니다':'목록에서 「다시」를 눌러 주세요'; $('#upW').textContent=''; $('#upBar').style.width='100%';
+    setTimeout(()=>{ o.classList.remove('show'); $('#upW').textContent='📵 다 올라갈 때까지 화면을 끄지 마세요'; },1300); } }
+function 올림갱신(){ const o=$('#upOv'); if(!o||!o.classList.contains('show')) return;
+  const 할=R.queue.filter(q=>['대기','업로드중','준비중','완료'].includes(q.status)), 끝=할.filter(q=>q.status==='완료').length;
+  $('#upN').textContent=`영수증 택배 출발! ${끝}/${할.length}장`; $('#upBar').style.width=(할.length?끝/할.length*100:0)+'%'; }
 async function runQueue(){
   R.autoSend = true;   // 아직 준비 중인 사진도 준비되면 바로 보냄
   if(R.running) return;
-  R.running=true; rerender();
+  R.running=true; rerender(); 올림창(true);
   const 할것=()=>R.queue.find(q=>q.status==='대기'&&q.b64);
   const 일꾼=async()=>{ let q; while((q=할것())) await 한장(q); };
   await Promise.all([일꾼(),일꾼()]);   // 두 장씩
-  R.running=false; rerender();
+  R.running=false; rerender(); 올림창(false);
   const n=R.queue.filter(q=>q.status==='완료').length; if(n) toast(`✅ 영수증 ${n}장 보냄. 새벽에 자동 분석됩니다`);
   if(!R.queue.some(q=>q.status==='준비중')) R.autoSend=false;
   setTimeout(뒤확인,25000);
