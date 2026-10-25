@@ -234,6 +234,12 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 .up-bar{width:220px;height:8px;border-radius:9px;background:var(--line);margin-top:14px;overflow:hidden}.up-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
 #upOv .up-warn{margin-top:14px;font-size:13px;font-weight:700;color:var(--beef)}
 @media (prefers-reduced-motion:reduce){.up-rc,.up-cloud{animation:none}}
+
+/* 🥬 오늘 카드 안 「눌러서 하는 것」 (26-10-25 사장님 「카드가 너무 하얘서 잘 안 보임 · 아이폰 다크모드로 보아도」)
+   아이폰 기본 버튼 바탕(밝은 회색)이 그대로 떠서 흰 글씨가 안 보였음 → 바탕·글자색을 직접 정함 (밝은·어두운 화면 같은 색) */
+.today-act{width:100%;text-align:left;color:#fff;background:linear-gradient(135deg,#2E7D4F,#3E9E66);border:0;border-radius:14px;padding:12px 12px;margin:6px 0;-webkit-appearance:none;appearance:none;box-shadow:0 2px 8px #0003}
+.today-act b{color:#fff}.today-act .num{color:#E3F5EA;opacity:1}
+.today-act .go{flex:none;align-self:center;background:#ffffff2e;border-radius:99px;padding:5px 10px;font-size:13px;font-weight:700;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -266,7 +272,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-23-v28';
+const APP_VERSION = '2026-10-25-v29';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -595,7 +601,7 @@ function rToday(){
   el.innerHTML = notifyBanner() + 영수증실패띠() + `
     ${todayRows.length?`<div class="today">
       <div class="today-h">오늘은</div>
-      ${todayRows.map(([em,t,sub,act])=>act?`<button class="today-r" data-act="${act}" style="width:100%;text-align:left;color:inherit"><span class="em">${em}</span><div style="flex:1"><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div><span style="font-size:20px">🧮</span></button>`:`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
+      ${todayRows.map(([em,t,sub,act])=>act?`<button class="today-r today-act" data-act="${act}"><span class="em">${em}</span><div style="flex:1"><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div><span class="go">🧮 계산</span></button>`:`<div class="today-r"><span class="em">${em}</span><div><b>${t}</b>${sub?`<span class="num">${esc(sub)}</span>`:''}</div></div>`).join('')}
     </div>`:''}
     <h2>오늘 할 일</h2>
     <p class="hint">위에서부터 하면 됩니다.</p>
