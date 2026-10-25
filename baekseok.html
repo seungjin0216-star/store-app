@@ -272,7 +272,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       문제가 생기면 기존 앱으로 돌아갈 수 있어야 합니다 (사장님 방침 26-10-01).
       서버는 같은 곳·같은 형식을 씁니다.
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-25-v30';
+const APP_VERSION = '2026-10-26-v31';
 
 /* ── 매장 설정: 원당은 이 덩어리만 바꿔서 만듭니다 ── */
 const STORE = {
@@ -372,7 +372,7 @@ const CLEAN = [
 ];
 const WEEKLY = [['w1','덕트 청소',1]];
 const MONTHLY = [['m1','냉장고 성에제거 및 청소'],['m2','주방바닥 퐁퐁청소'],['m3','유리 청소']];
-const FINAL = [['x1','고기·식자재 발주 무조건 하기'],['x2','저녁 먹을 거 확인 후 주문'],['x3','에어컨 끄기 (홀3, 주방1)'],['x4','가스 끄기']];
+const FINAL = [['x1','고기·식자재 발주 무조건 하기'],['x2','저녁 먹을 거 확인 후 주문'],['x3','에어컨 끄기 (홀3, 주방1)'],['x4','가스 끄기'],['x5','냉장고 제상 누르기']];   // x5 26-10-26 사장님 「마감체크리스트에 마지막에 『냉장고재상 누르기』도 포함」
 
 const FILL_FLAT = FILL.flatMap(e=>Array.isArray(e)?[{id:e[0],label:e[1]}]:e.items.map(([id,label])=>({id,label,g:e.g})));
 const LABEL = {}; [...FILL_FLAT,...CLEAN.flatMap(c=>c.items.map(([id,label])=>({id,label}))),...FINAL.map(([id,label])=>({id,label})),...OPEN_ITEMS.map(([id,label])=>({id,label}))].forEach(x=>LABEL[x.id]=x.label);
@@ -791,7 +791,7 @@ function rFood(){
     ${휴무줄()}
     ${monTue?`<div class="banner warn"><span class="em">⚠️</span><div><b>월·화 발주 — 화요일 저녁 자동 발송</b><span>화요일 20:30에 업체로 나가고 수요일 납품. 월요일 14시 전 발주는 바로 나갑니다</span></div></div>`:''}
     ${(f.sentDetail||[]).length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 업체로 나간 발주 (문자 그대로)</b><span>${f.sentDetail.map(x=>`${esc(x.supplier)} ${esc(x.at)}${x.failed?' ⚠️실패':''}: ${x.items.map(esc).join(', ')}`).join('<br>')}</span></div></div>`:나간업체.length?`<div class="banner green"><span class="em">📨</span><div><b>오늘 넣은 발주</b><span>${나간업체.map(k=>`${supOf(k).emoji} ${k} ${sentOf(k)}`).join(' · ')}</span></div></div>`:''}
-    ${(f.carried||[]).length?`<div class="banner green"><span class="em">📦</span><div><b>어제 담은 ${(f.carried||[]).map(esc).join('·')} 품목이 이어져 있습니다</b><span>${(f.carried||[]).map(u=>`${esc(u)}: ${((f.carriedItems||{})[u]||[]).map(esc).join(', ')||'-'}`).join('<br>')}<br>오늘 보낼 때 같이 나갑니다</span></div></div>`:''}
+    ${(f.carried||[]).length?`<div class="banner green"><span class="em">📦</span><div><b>어제 담은 ${(f.carried||[]).map(esc).join('·')} 품목이 이어져 있습니다</b><span>${(f.carried||[]).map(u=>`${esc(u)}: ${((f.carriedItems||{})[u]||[]).map(esc).join(', ')||'-'}`).join('<br>')}<br>${(f.carried||[]).every(u=>(f.sentDetail||[]).some(x=>x.supplier===u))?'✅ 오늘 보낸 발주에 같이 나갔습니다 (아래 문자 확인)':'오늘 보낼 때 같이 나갑니다'}</span></div></div>`:''}
     ${(f.reserved||[]).map(x=>`<div class="banner warn"><span class="em">📦</span><div><b>${esc(x.supplier)} 이미 예약됨 · ${esc(x.when)} 나감</b><span>${x.items.map(i=>esc(i.item)+(i.qty?' '+esc(i.qty):'')).join(', ')}<br>지금 더 보내도 이 예약에 합쳐져 같은 시각에 한 번에 갑니다 — 위 품목은 다시 담지 마세요</span></div></div>`).join('')}
     ${f.sent?`<div class="banner green"><span class="em">✅</span><div><b>${String(f.sent).includes('예약')?f.sent+' — 이 폰에서 넣음':f.sent+' 이 폰에서 보냄'}</b><span>더 담아서 또 보내도 됩니다</span></div></div>`:''}
     ${daepa>=STORE.daepaKimchiOver?`<div class="banner green"><span class="em">🥬</span><div><b>대파 ${daepa}단</b><span>납품일이 「대파김치 하는 날」로 오늘 화면에 뜹니다</span></div></div>`:''}
