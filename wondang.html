@@ -252,6 +252,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
   <span class="demo" id="modePill" title="여기서는 아무것도 보내지 않습니다">미리보기</span>
 </div></header>
 <main class="wrap" id="main">
+  <section class="screen" id="t-home"></section>
   <section class="screen" id="t-food"></section>
   <section class="screen" id="t-clean"></section>
   <section class="screen" id="t-rcpt"></section>
@@ -270,7 +271,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-23-w3';
+const APP_VERSION = '2026-10-26-w4';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -367,12 +368,33 @@ if(!S || S.day!==BD_KEY) S={ day:BD_KEY, food:{sup:'콩나물', cart:{}, sent:{}
 function save(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(S)); }catch(e){} }
 
 /* ── 탭 ── */
-const TABS=[['t-food','🥬','식자재발주'],['t-clean','🧽','청소체크'],['t-rcpt','🧾','영수증']];
-let cur='t-food';
-const RENDER={'t-food':rFood,'t-clean':rClean,'t-rcpt':rRcpt};
-function go(id){ cur=id; RENDER[id](); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); rTabs(); window.scrollTo(0,0); if(id==='t-clean') loadClean(); }
+const TABS=[['t-home','🏠','홈'],['t-food','🥬','식자재발주'],['t-clean','🧽','청소체크'],['t-rcpt','🧾','영수증']];
+let cur='t-home';
+const RENDER={'t-home':rHome,'t-food':rFood,'t-clean':rClean,'t-rcpt':rRcpt};
+function go(id){ cur=id; RENDER[id](); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); rTabs(); window.scrollTo(0,0); if(id==='t-clean') loadClean(); if(id==='t-home') loadOrders(); }
 function rerender(){ RENDER[cur](); rTabs(); }
 function rTabs(){ $('#tabs').innerHTML=TABS.map(([id,ic,l])=>`<button data-tab="${id}" aria-current="${id===cur?'page':'false'}"><span class="ic" aria-hidden="true">${ic}</span>${l}</button>`).join(''); }
+
+/* ══════════════ 🏠 홈 — 어제·오늘 넣은 발주 (26-10-26) ══════════════
+   사장님 「원당 매장앱(직원)용 홈 화면 · 발주 확인 · 어제 발주 넣은 것 · 오늘 발주 넣은 것 · 업체별로 몇 시에 넣었는지」
+   서버 = 원당 발주 GAS ?action=orders (식자재발주_원당 탭 · 두 폰이 같이 봄) · 시각은 26-10-26 부터 기록 (그 전 것은 「-」) */
+let ORD = (()=>{ try{ return JSON.parse(localStorage.getItem('wondang-orders')||'null'); }catch(e){ return null; } })();
+async function loadOrders(){
+  if(!LIVE) return;
+  const r=await API.jsonp(STORE.orderGas,{action:'orders'},12000);
+  if(r&&r.ok){ ORD=r; try{ localStorage.setItem('wondang-orders',JSON.stringify(r)); }catch(e){} if(cur==='t-home') rHome(); }
+}
+function rHome(){
+  const 업체칸 = list => { if(!list||!list.length) return '<div class="row"><span class="main mut">넣은 발주 없음</span></div>';
+    const by={}; list.forEach(x=>{ (by[x.supplier]=by[x.supplier]||[]).push(x); });
+    return Object.keys(by).map(k=>{ const s=SUPS.find(z=>z.key===k); return by[k].map(x=>`<div class="row"><span class="main"><b>${s?s.emoji+' ':''}${esc(k)}</b><span class="sub">${esc(x.items)}</span></span><span class="tag ${x.at?'ok':'wait'} num">${esc(x.at||'-')}</span></div>`).join(''); }).join(''); };
+  const 날 = k => k ? String(k).replace(/^\d\d\./,'').replace('.','/') : '';
+  $('#t-home').innerHTML = `
+    <h2>📨 오늘 넣은 발주 <small class="mut" style="font-weight:500">${esc(날(ORD&&ORD.today))}</small></h2><div class="list">${ORD?업체칸(ORD.오늘):'<div class="row"><span class="main mut">불러오는 중…</span></div>'}</div>
+    <h2>🗓 어제 넣은 발주 <small class="mut" style="font-weight:500">${esc(날(ORD&&ORD.yesterday))}</small></h2><div class="list">${ORD?업체칸(ORD.어제):'<div class="row"><span class="main mut">불러오는 중…</span></div>'}</div>
+    <p class="hint" style="text-align:center;margin-top:12px">업체로 문자가 나간 기록입니다 · 오른쪽은 넣은 시각 · 오전 8시 전은 전날 영업으로 셉니다</p>
+    <button class="big-btn sec" data-tab="t-food">🥬 식자재 발주하러 가기</button>`;
+}
 
 /* ══════════════ 🥬 식자재 발주 ══════════════
    ⚠️ 원당 서버는 바구니가 없음 → 이 폰에 담고 「보내기」 때 업체별 문자 (옛 원당 발주앱 food.html 과 같은 서버·같은 꼴)
@@ -403,7 +425,7 @@ async function 보내기(b){
   // ⚠️ 답장을 기다리지 않음 (no-cors) — 기다리다 「실패」를 보고 또 누르면 문자가 두 번 감 (9/17 주류 6통 사고)
   API.post(STORE.orderGas,{type:'food_order',branch:'wondang',delay_to_tuesday:false,messages:ms.map(m=>({supplier:m.supplier,phone:'',body:m.body,channel:'SMS',items:m.items}))}).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다'));
   const t=hhmm(); ms.forEach(m=>{ S.food.sent[m.supplier]=t; SUPS.find(s=>s.key===m.supplier).items.forEach(i=>delete S.food.cart[m.supplier+':'+i]); });
-  save(); closeSheet(); rerender(); toast(`📨 ${ms.map(m=>m.supplier).join('·')} 발주 보냄`);
+  save(); closeSheet(); rerender(); toast(`📨 ${ms.map(m=>m.supplier).join('·')} 발주 보냄`); setTimeout(loadOrders,5000);
 }
 
 /* ══════════════ 🧽 청소 체크 ══════════════
@@ -640,8 +662,8 @@ document.addEventListener('input', e=>{
 /* ── 시작 ── */
 $('#dateLabel').textContent=`원당점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[BD.getDay()]}요일 · ${APP_VERSION}`;
 if(LIVE) $('#modePill').hidden=true;
-go('t-food');
-if(LIVE){ loadClean(); setTimeout(뒤확인,8000); setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
+go('t-home');
+if(LIVE){ loadClean(); setInterval(()=>{ if(document.visibilityState==='visible'&&cur==='t-home') loadOrders(); },60000); setTimeout(뒤확인,8000); setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
   setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(k!==BD_KEY) location.reload(); },60000); }
 </script>
