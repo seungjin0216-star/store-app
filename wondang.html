@@ -271,7 +271,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-26-w4';
+const APP_VERSION = '2026-10-28-w5';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -308,8 +308,9 @@ const CLEAN = [
 const 하루한도 = 3;
 const 오늘장수 = ()=>{ try{ return +localStorage.getItem('wondang-photos-'+BD_KEY)||0; }catch(e){ return 0; } };
 const 장수더하기 = ()=>{ try{ localStorage.setItem('wondang-photos-'+BD_KEY, 오늘장수()+1); }catch(e){} };
-const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락',''],['관리비','⚡','매장관리비','전기 명세서']];
-const DIRECT_TYPES = [['배달매출','🛵','배달매출','월 1회'],['가게내부카드','💳','가게내부카드','월 합계'],['가게외부카드','🛒','가게외부카드','인터넷 주문'],['콩나물','🌾','콩나물',''],['키위','🥝','키위','보성'],['매장관리비','💧','매장관리비','수도 · 숫자'],['기타세금','🧾','기타세금',''],['기타잡비용','🧰','기타잡비용','']];
+/* 26-10-28 w5 사장님 「매장관리비 영수증으로 하는 게 아닌 그냥 수기 입력으로 통합」 「콩나물 빼도 돼 (식자재 발주로 자동 계상)」 「금액만 적을 것에 가스사용료」 */
+const DOC_TYPES = [['마감정산서','📊','매출','마감정산서'],['미락','🧾','미락','']];
+const DIRECT_TYPES = [['배달매출','🛵','배달매출','월 1회'],['가게내부카드','💳','가게내부카드','월 합계'],['가게외부카드','🛒','가게외부카드','인터넷 주문'],['키위','🥝','키위','보성'],['매장관리비','🏢','매장관리비','전기·수도'],['가스사용료','🔥','가스사용료',''],['기타세금','🧾','기타세금',''],['기타잡비용','🧰','기타잡비용','']];
 /* ⚠️ 계정 이름은 원당 손익 그대로 (백석은 「가게카드」 · 원당은 「가게내부카드」「가게외부카드」 — 문서/10_복제_와꾸.md 6번) */
 
 const DAY = ['일','월','화','수','목','금','토'];
