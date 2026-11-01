@@ -47,6 +47,7 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
 .sh{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding-right:12px;pointer-events:none}
 .sh>*{pointer-events:auto}
 .sh .chip{height:36px;max-width:300px;min-width:0}
+.sh .sh-q{min-width:84px}
 .sh input{width:96px;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 10px;font:inherit;color:inherit;
   -webkit-user-select:text;user-select:text}
 .sh .sh-w{color:var(--accent);border-color:#e9b9a3}
@@ -191,14 +192,9 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
   <div class="c-head">
     <div class="c-top" id="cDrag"><span class="c-brand">CASIO</span><span class="c-solar"></span><span class="c-model">JS-40B <b>14</b></span><button class="c-min" id="cMin" aria-label="계산기 접기">–</button></div>
     <div class="c-lcd">
-      <div class="c-ind"><i data-i="m">M</i><i data-i="neg">−</i><i data-i="gt">GT</i><i data-i="k">K</i><i data-i="e">E</i></div>
+      <div class="c-ind"><i data-i="m">M</i><i data-i="neg">−</i><i data-i="k">K</i><i data-i="e">E</i></div>
       <div class="c-num" id="cNum">0.</div>
     </div>
-  </div>
-  <div class="c-sw">
-    <div class="c-slide" data-sw="rnd"></div>
-    <div class="c-slide" data-sw="dp"></div>
-    <div class="c-tax"><button class="k" data-k="tax-"><small>TAX−</small></button><button class="k" data-k="tax+"><small>TAX+</small></button></div>
   </div>
   <div class="c-keys" id="cKeys"></div>
   <div class="c-grip" id="cGrip"></div>
@@ -368,7 +364,12 @@ function resize() {
 function maxOff() { return Math.max(0, (P() ? P().h : PAGE) - H / scale); }
 function view(ctx) { ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, -offY * dpr * scale); }
 let sbT = 0;
+// 26-11-01 사장님 「밑에가 써져야 조금 넘어가는데 그냥 자유롭게 스크롤」
+//   → 아래 끝 가까이 가면 종이를 한 장씩 더 붙임 (끝없이 내려감 · 안 쓴 곳은 저장할 때 늘어난 길이만 남음)
+//   문제 칸 경계는 「＋ 문제」를 누른 순간 쓴 글씨 바로 아래로 정해짐 → 앞 문제는 다음 머리줄까지로 고정
 function setOff(v) {
+  const p = P(), vis = H / scale;
+  if (p && v + vis > p.h - 300) p.h = Math.ceil((v + vis + PAGE) / 100) * 100;
   offY = Math.min(Math.max(0, v), maxOff());
   paintAll(); placeHeads();
   const sb = $('#sb'), m = maxOff();
@@ -500,22 +501,32 @@ function renderHeads() {
   const box = $('#heads'); box.innerHTML = ''; heads = [];
   P().qs.forEach((q, i) => {
     const d = document.createElement('div'); d.className = 'sh';
-    d.innerHTML = '<button class="chip sh-ch"><span></span></button><input class="sh-q" placeholder="문제 번호" autocomplete="off">'
+    // 문제 번호는 평소엔 단추 · 누를 때만 글 칸 — 글 칸이 늘 떠 있으면 근처에 쓴 펜슬 글씨를
+    // 아이패드 「손글씨 → 글자」(Scribble)가 가져가서 「펜슬이 안 먹힘」이 됨 (26-11-01)
+    d.innerHTML = '<button class="chip sh-ch"><span></span></button><button class="chip sh-q"></button>'
       + '<button class="chip sh-w"></button>' + (i ? '<button class="sh-x" aria-label="칸 나누기 없애기">✕ 칸</button>' : '');
-    const inp = d.querySelector('input');
+    const qb = d.querySelector('.sh-q');
     d.querySelector('.sh-ch').onclick = () => openPick(q);
-    inp.value = q.q || '';
-    inp.addEventListener('input', () => { q.q = inp.value.trim(); touch(P()); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
-    d.querySelector('.sh-w').onclick = () => toggleWrong(q, inp);
+    qb.onclick = () => editNo(q, qb);
+    d.querySelector('.sh-w').onclick = () => toggleWrong(q, qb);
     if (i) d.querySelector('.sh-x').onclick = () => delQ(q);
     box.append(d); heads.push({ q, d });
     syncHead(q);
   });
   placeHeads();
 }
+function editNo(q, qb) {
+  const inp = document.createElement('input'); inp.className = 'sh-q'; inp.autocomplete = 'off'; inp.placeholder = '문제 번호';
+  inp.value = q.q || '';
+  const done = () => { q.q = inp.value.trim(); touch(P()); if (inp.isConnected) inp.replaceWith(qb); syncHead(q); };
+  inp.addEventListener('blur', done);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  qb.replaceWith(inp); inp.focus();
+}
 function syncHead(q) {
   const h = heads.find(h => h.q === q); if (!h) return;
+  const qb = h.d.querySelector('button.sh-q');
+  if (qb) { qb.textContent = q.q ? (/\d$/.test(q.q) ? q.q + '번' : q.q) : '문제 번호'; qb.style.color = q.q ? '' : 'var(--mute)'; }
   const c = chOf(q);
   h.d.querySelector('.sh-ch span').textContent = q.subj ? short(q.subj) + (c ? ' ' + (c[0] === '부록' ? '부록 ' : +c[0] + '장 ') + c[1] : '') + ' ▾' : '과목·장 ▾';
   const w = h.d.querySelector('.sh-w'); w.classList.toggle('on', !!q.wrong); w.textContent = q.wrong ? '★ 오답노트' : '☆ 오답노트';
@@ -668,28 +679,54 @@ function eraseAt(e) {
   if (hit) frame(paintAll);
 }
 
+/* 🔴 26-11-01 사장님 「필기를 하다가 갑자기 줄이 쭉 쳐지던가 갑자기 펜슬이 안먹힌다던가」
+   ① 펜을 뗀 소식(pointerup)을 놓치면 pen 이 계속 「쓰는 중」으로 남음
+      → 새로 대도 무시(안 먹힘) · 펜슬을 띄운 채 움직이는 것(호버)까지 선으로 이어짐(쭉 쳐짐)
+      고침: 떼는 소식을 종이 말고 화면 전체에서 받음 · 닿지 않은 펜 움직임(buttons 0)이면 그 자리에서 획을 끝냄
+            쓰는 중에 펜이 또 닿으면 앞 획을 끝내고 새로 시작 (무시하지 않음)
+   ② 손바닥이 두 손가락으로 잡혀 「두 손가락 톡 = 되돌리기」가 방금 쓴 획을 지움 → 펜 뗀 지 1.5초 안이면 안 함
+   ③ 넓게 닿는 것(손바닥)은 손가락으로 안 침 · 펜 뗀 지 0.5초 안의 손가락도 무시 */
+const PALM = 45;   // 닿은 넓이(px)가 이보다 크면 손바닥
+function endPen() {
+  if (pen === null) return;
+  pen = null; lastPen = Date.now();
+  if (erased) {
+    // 지운 차례 그대로 둠 → 되돌릴 때 거꾸로 끼워 넣어야 원래 순서가 됨
+    if (erased.length) push({ a:'del', items: erased });
+    erased = null; return;
+  }
+  if (lasso) return finishLasso();
+  if (live && live.p.length) {
+    P().strokes.push(live); push({ a:'add', s: live });
+    const before = P().h; grow(P()); if (P().h !== before) setOff(offY);
+  }
+  live = null; livePred = null; paintAll();
+}
 paper.addEventListener('pointerdown', e => {
   closeMenu();
   if (e.target.closest('#selbar,.sh')) return;
+  stopFling();
   // 고른 것이 있으면: 상자 안을 누르면 (펜이든 손가락이든) 끌어서 옮기기 · 밖을 누르면 고르기 풀기
-  if (sel && !drag && !pen && (e.pointerType !== 'touch' || Date.now() - lastPen > 400)) {
+  if (sel && !drag && pen === null && (e.pointerType !== 'touch' || Date.now() - lastPen > 500)) {
     if (inSel(...pt(e))) { e.preventDefault(); return startDrag(e); }
     if (e.pointerType !== 'touch') { clearSel(); if (st.tool !== 'lasso') return; }
   }
   if (e.pointerType === 'touch') {
-    // 손바닥 막기: 펜을 쓰는 중이거나 방금 썼으면 손가락은 무시
-    if (pen || drag || Date.now() - lastPen < 400) return;
-    fingers.set(e.pointerId, { x:e.clientY, t:Date.now() });
-    if (fingers.size === 1) pan = { y:e.clientY, off:offY, moved:false };
-    if (fingers.size === 2) { twoTap = Date.now(); pan = null; }
+    // 손바닥 막기: 펜을 쓰는 중이거나 방금 썼으면 · 넓게 닿으면 무시
+    if (pen !== null || drag || Date.now() - lastPen < 500) return;
+    if (e.width > PALM || e.height > PALM) return;
+    fingers.set(e.pointerId, { t:Date.now() });
+    if (fingers.size === 1) pan = { y:e.clientY, off:offY, moved:false, trail:[[e.clientY, performance.now()]] };
+    if (fingers.size === 2) { twoTap = Date.now() - lastPen > 1500 ? Date.now() : null; pan = null; }
     return;
   }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (pen || drag) return;
+  if (drag) return;
+  if (pen !== null) endPen();   // 앞 획의 「뗐다」를 놓쳤으면 여기서 끝냄
   e.preventDefault();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   try { paper.setPointerCapture(e.pointerId); } catch (_) {}
-  pen = e.pointerId; pan = null; fingers.clear();
+  pen = e.pointerId; pan = null; fingers.clear(); twoTap = null;
   if (st.tool === 'er') { erased = []; eraseAt(e); return; }
   if (st.tool === 'lasso') { lasso = [pt(e)]; return; }
   if (st.tool === 'hl') live = { t:'hl', c: st.hlColor, w: SIZES.hl[st.size], p:[] };
@@ -704,7 +741,8 @@ paper.addEventListener('pointermove', e => {
     frame(paintAll, 'drag'); return;
   }
   if (e.pointerId === pen) {
-    if (st.tool === 'er') eraseAt(e);
+    if (e.pointerType !== 'touch' && e.buttons === 0) return endPen();   // 펜이 이미 떨어짐 (떼는 소식을 놓침)
+    if (erased) eraseAt(e);
     else if (lasso) { for (const ev of evsOf(e)) lasso.push(pt(ev)); frame(paintLive); }
     else if (live) { addPt(e); frame(paintLive); }
     return;
@@ -713,37 +751,44 @@ paper.addEventListener('pointermove', e => {
     const dy = e.clientY - pan.y;
     if (!pan.moved && Math.abs(dy) < 8) return;
     pan.moved = true;
+    pan.trail.push([e.clientY, performance.now()]); if (pan.trail.length > 6) pan.trail.shift();
     const v = pan.off - dy / scale;
     frame(() => setOff(v), 'pan');
   }
 });
 function penUp(e) {
   if (drag && e.pointerId === drag.id) { endDrag(); if (e.pointerType !== 'touch') lastPen = Date.now(); return; }
-  if (e.pointerId === pen) {
-    pen = null; lastPen = Date.now();
-    if (st.tool === 'er') {
-      // 지운 차례 그대로 둠 → 되돌릴 때 거꾸로 끼워 넣어야 원래 순서가 됨
-      if (erased && erased.length) push({ a:'del', items: erased });
-      erased = null; return;
-    }
-    if (lasso) return finishLasso();
-    if (live && live.p.length) {
-      P().strokes.push(live); push({ a:'add', s: live });
-      const before = P().h; grow(P()); if (P().h !== before) setOff(offY);
-    }
-    live = null; livePred = null; paintAll();
-    return;
-  }
+  if (e.pointerId === pen) return endPen();
   if (fingers.has(e.pointerId)) {
     fingers.delete(e.pointerId);
     // 손가락으로 톡 (안 움직임) = 고르기 풀기 · 두 손가락으로 톡 = 되돌리기
     if (sel && pan && !pan.moved && fingers.size === 0 && e.type === 'pointerup') clearSel();
-    if (twoTap && fingers.size === 0) { if (Date.now() - twoTap < 300 && e.type === 'pointerup') undo(); twoTap = null; }
+    if (twoTap && fingers.size === 0) { if (Date.now() - twoTap < 300 && e.type === 'pointerup' && Date.now() - lastPen > 1500) undo(); twoTap = null; }
+    if (pan && pan.moved && fingers.size === 0 && e.type === 'pointerup') fling(pan.trail);
     if (fingers.size === 0) pan = null;
   }
 }
-paper.addEventListener('pointerup', penUp);
-paper.addEventListener('pointercancel', penUp);
+// 종이 밖(위 막대·계산기 위)에서 떼도 받도록 화면 전체에서 들음
+window.addEventListener('pointerup', penUp);
+window.addEventListener('pointercancel', penUp);
+paper.addEventListener('lostpointercapture', e => { if (e.pointerId === pen) endPen(); });
+
+/* ── 튕기기 — 손가락으로 쓸고 놓으면 조금 더 미끄러짐 (메모 앱처럼) ── */
+let flingRaf = 0;
+function stopFling() { cancelAnimationFrame(flingRaf); flingRaf = 0; }
+function fling(trail) {
+  if (trail.length < 2) return;
+  const [y1, t1] = trail[trail.length - 1], [y0, t0] = trail[0];
+  if (performance.now() - t1 > 80 || t1 - t0 < 8) return;   // 멈췄다가 뗐으면 안 미끄러짐
+  let vel = (y1 - y0) / (t1 - t0), last = performance.now();   // 화면 px / ms
+  const step = now => {
+    const dt = Math.min(40, now - last); last = now;
+    setOff(offY - vel * dt / scale);
+    vel *= Math.pow(.95, dt / 16);
+    flingRaf = Math.abs(vel) > .02 ? requestAnimationFrame(step) : 0;
+  };
+  stopFling(); flingRaf = requestAnimationFrame(step);
+}
 paper.addEventListener('wheel', e => { e.preventDefault(); setOff(offY + e.deltaY / scale); }, { passive:false });
 document.addEventListener('gesturestart', e => e.preventDefault());
 // 🔴 아이패드 사파리는 펜슬을 길게 대거나 빨리 그으면 돋보기·확대·글씨인식이 끼어들어 획을 끊음 (pointercancel)
@@ -847,11 +892,11 @@ $('#pick').addEventListener('click', e => { if (e.target.id === 'pick') closePic
 /* ── 오답노트 ─────────────────────────────
    문제 칸에 「오답」 표시만 함 (복사하지 않음 → 풀이와 오답노트가 어긋나지 않음)
    모아 보기: ☰ → 오답노트 → 과목 → 목차 → 장 → 그 장의 오답 칸들이 문제 번호 순으로 한 줄로 이어짐 */
-function toggleWrong(q, inp) {
+function toggleWrong(q, qb) {
   q.wrong = !q.wrong; q.wrongAt = q.wrong ? Date.now() : 0; touch(P()); syncHead(q); paintAll();
   if (!q.wrong) return toast('오답노트에서 뺐습니다');
   if (!q.subj || (BOOKS[q.subj].length && q.ch == null)) { toast('어느 장 문제인지 골라주세요'); openPick(q); }
-  else if (!q.q) { toast('문제 번호도 적어주세요'); inp.focus(); }
+  else if (!q.q) { toast('문제 번호도 적어주세요'); editNo(q, qb); }
   else toast('오답노트에 넣었습니다 · ' + label(q));
 }
 
@@ -1016,11 +1061,12 @@ $('#add2').onclick = () => { closeList(); addPage(); };
    26-11-01 사장님 「세무사시험에는 계산기가 필요해 … 카시오 js-40b … 기능과 생김새가 유사하게 · 크기조절」
    사진(IMG_5968) 그대로: 14자리 · 반올림 스위치 F/CUT/5/4 · 소수점 스위치 4/3/2/1/0/ADD2 · TAX−/TAX+
    계산은 카시오 방식: 누른 차례대로 (곱셈 먼저 아님) · 같은 연산 두 번 = K(상수) · = 결과는 GT 에 쌓임
-   ⚠️ M/EX 키는 무엇인지 확인 못 함 → 눌러도 아무 일 없음 (확인 필요) · TAX 세율은 10% 고정 */
+   26-11-01 사장님 「mc mr 버튼라인 위로는 안씀. 그 버튼들 만큼 삭제해서 계산기 크기를 줄여줘」
+     → 스위치 줄(반올림·소수·TAX)과 M/EX % √ ▶ GT 줄을 뺌 · 반올림은 F(안 함) 고정
+     계산 규칙(% · GT · ADD2 · TAX)은 코드에 남겨 둠 — 다시 넣으려면 KEYS 맨 앞 줄과 c-sw 를 되살리면 됨 (git 9704389) */
 const C = { x:'0', entry:false, fresh:true, typed:false, a:null, op:null, K:null, m:0, gt:0, err:false, last:null, rnd:'F', dp:'2' };
 const RND = ['F', 'CUT', '5/4'], DP = ['4', '3', '2', '1', '0', 'ADD2'];
 const KEYS = [
-  ['mex', 'M/EX', 'k'], ['pct', '%', 'k'], ['sqrt', '√', 'k'], ['bs', '▶', 'k'], ['gt', 'GT', 'k'],
   ['mc', 'MC', 'k m'], ['mr', 'MR', 'k m'], ['mm', 'M−', 'k m'], ['mp', 'M+', 'k m'], ['/', '÷', 'k op'],
   ['neg', '+/−', 'k'], ['7', '7', 'k n'], ['8', '8', 'k n'], ['9', '9', 'k n'], ['*', '×', 'k op'],
   ['c', 'C', 'k c'], ['4', '4', 'k n'], ['5', '5', 'k n'], ['6', '6', 'k n'], ['-', '−', 'k op'],
@@ -1134,7 +1180,6 @@ function drawCalc() {
     if (b.dataset.k !== 'mex') press(b.dataset.k);
   });
   calcEl.addEventListener('touchstart', e => { if (!e.target.closest('#cMin')) e.preventDefault(); }, { passive:false });
-  try { const sw = JSON.parse(pref('calcSw') || 'null'); if (sw) { C.rnd = sw.rnd; C.dp = sw.dp; } } catch (_) {}
   drawCalc();
 })();
 function calcKeyboard(e) {
@@ -1143,7 +1188,7 @@ function calcKeyboard(e) {
   if (k) { e.preventDefault(); press(k); }
 }
 // 위치·크기 — 위쪽 검은 띠를 끌면 옮겨지고, 오른쪽 아래 모서리를 끌면 커지고 작아짐
-const cpos = { x:null, y:null, w:300, open:false };
+const cpos = { x:null, y:null, w:270, open:false };
 function placeCalc() {
   const w = Math.max(200, Math.min(cpos.w, innerWidth - 16));
   calcEl.style.fontSize = (w / 30) + 'px';
