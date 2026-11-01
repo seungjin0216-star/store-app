@@ -641,7 +641,7 @@ $('#wipe').onclick = () => {
 };
 
 /* ── 펜 · 손가락 ─────────────────────────────── */
-let live = null, livePred = null, pen = null, erased = null, lastPen = 0;
+let live = null, livePred = null, pen = null, erased = null, lastPen = 0, penSeen = 0;   // penSeen = 쓰는 중 펜 신호가 마지막으로 온 때
 const fingers = new Map();
 let pan = null, twoTap = null;
 
@@ -685,8 +685,9 @@ function eraseAt(e) {
       고침: 떼는 소식을 종이 말고 화면 전체에서 받음 · 닿지 않은 펜 움직임(buttons 0)이면 그 자리에서 획을 끝냄
             쓰는 중에 펜이 또 닿으면 앞 획을 끝내고 새로 시작 (무시하지 않음)
    ② 손바닥이 두 손가락으로 잡혀 「두 손가락 톡 = 되돌리기」가 방금 쓴 획을 지움 → 펜 뗀 지 1.5초 안이면 안 함
-   ③ 넓게 닿는 것(손바닥)은 손가락으로 안 침 · 펜 뗀 지 0.5초 안의 손가락도 무시 */
-const PALM = 45;   // 닿은 넓이(px)가 이보다 크면 손바닥
+   ③ 펜 뗀 지 0.5초 안의 손가락은 무시
+   ⚠️ 26-11-01 「닿은 넓이 45px 넘으면 손바닥」을 넣었다가 아이패드에서 스크롤이 아예 안 됨 (사장님 「아예 스크롤이 안됨」)
+      → 아이패드는 보통 손가락도 그만큼 넓게 알려주는 것으로 보임 · 넓이로 손바닥 가리기는 뺌 (다시 넣지 말 것) */
 function endPen() {
   if (pen === null) return;
   pen = null; lastPen = Date.now();
@@ -713,8 +714,10 @@ paper.addEventListener('pointerdown', e => {
   }
   if (e.pointerType === 'touch') {
     // 손바닥 막기: 펜을 쓰는 중이거나 방금 썼으면 · 넓게 닿으면 무시
+    // 펜이 「쓰는 중」인데 0.3초 넘게 펜 신호가 없으면 떼는 소식을 놓친 것 → 끝내고 손가락을 받음
+    //   (안 그러면 펜을 다시 댈 때까지 스크롤이 막힘)
+    if (pen !== null && performance.now() - penSeen > 300) { endPen(); lastPen = Date.now() - (performance.now() - penSeen); }   // 「뗀 때」= 마지막 펜 신호 때
     if (pen !== null || drag || Date.now() - lastPen < 500) return;
-    if (e.width > PALM || e.height > PALM) return;
     fingers.set(e.pointerId, { t:Date.now() });
     if (fingers.size === 1) pan = { y:e.clientY, off:offY, moved:false, trail:[[e.clientY, performance.now()]] };
     if (fingers.size === 2) { twoTap = Date.now() - lastPen > 1500 ? Date.now() : null; pan = null; }
@@ -726,7 +729,7 @@ paper.addEventListener('pointerdown', e => {
   e.preventDefault();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   try { paper.setPointerCapture(e.pointerId); } catch (_) {}
-  pen = e.pointerId; pan = null; fingers.clear(); twoTap = null;
+  pen = e.pointerId; penSeen = performance.now(); pan = null; fingers.clear(); twoTap = null;
   if (st.tool === 'er') { erased = []; eraseAt(e); return; }
   if (st.tool === 'lasso') { lasso = [pt(e)]; return; }
   if (st.tool === 'hl') live = { t:'hl', c: st.hlColor, w: SIZES.hl[st.size], p:[] };
@@ -741,6 +744,7 @@ paper.addEventListener('pointermove', e => {
     frame(paintAll, 'drag'); return;
   }
   if (e.pointerId === pen) {
+    penSeen = performance.now();
     if (e.pointerType !== 'touch' && e.buttons === 0) return endPen();   // 펜이 이미 떨어짐 (떼는 소식을 놓침)
     if (erased) eraseAt(e);
     else if (lasso) { for (const ev of evsOf(e)) lasso.push(pt(ev)); frame(paintLive); }
