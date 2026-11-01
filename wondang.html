@@ -253,6 +253,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 </div></header>
 <main class="wrap" id="main">
   <section class="screen" id="t-home"></section>
+  <section class="screen" id="t-meat"></section>
   <section class="screen" id="t-food"></section>
   <section class="screen" id="t-clean"></section>
   <section class="screen" id="t-rcpt"></section>
@@ -271,7 +272,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-10-28-w5';
+const APP_VERSION = '2026-11-01-w6';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -366,13 +367,14 @@ const API = {
 const SAVE_KEY='jangsoo-store-wondang';
 let S; try{ S=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){ S=null; }
 if(!S || S.day!==BD_KEY) S={ day:BD_KEY, food:{sup:'콩나물', cart:{}, sent:{}} };
+S.meat = S.meat || { gc:0, dc:0, mc:0, box:0, extras:[], sent:null };
 function save(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(S)); }catch(e){} }
 
 /* ── 탭 ── */
-const TABS=[['t-home','🏠','홈'],['t-food','🥬','식자재발주'],['t-clean','🧽','청소체크'],['t-rcpt','🧾','영수증']];
+const TABS=[['t-home','🏠','홈'],['t-meat','🥩','고기입고'],['t-food','🥬','식자재발주'],['t-clean','🧽','청소체크'],['t-rcpt','🧾','영수증']];
 let cur='t-home';
-const RENDER={'t-home':rHome,'t-food':rFood,'t-clean':rClean,'t-rcpt':rRcpt};
-function go(id){ cur=id; RENDER[id](); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); rTabs(); window.scrollTo(0,0); if(id==='t-clean') loadClean(); if(id==='t-home') loadOrders(); }
+const RENDER={'t-home':rHome,'t-meat':rMeat,'t-food':rFood,'t-clean':rClean,'t-rcpt':rRcpt};
+function go(id){ cur=id; RENDER[id](); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id)); rTabs(); window.scrollTo(0,0); if(id==='t-clean') loadClean(); if(id==='t-home') loadOrders(); if(id==='t-meat') readMeat(); }
 function rerender(){ RENDER[cur](); rTabs(); }
 function rTabs(){ $('#tabs').innerHTML=TABS.map(([id,ic,l])=>`<button data-tab="${id}" aria-current="${id===cur?'page':'false'}"><span class="ic" aria-hidden="true">${ic}</span>${l}</button>`).join(''); }
 
@@ -395,6 +397,32 @@ function rHome(){
     <h2>🗓 어제 넣은 발주 <small class="mut" style="font-weight:500">${esc(날(ORD&&ORD.yesterday))}</small></h2><div class="list">${ORD?업체칸(ORD.어제):'<div class="row"><span class="main mut">불러오는 중…</span></div>'}</div>
     <p class="hint" style="text-align:center;margin-top:12px">업체로 문자가 나간 기록입니다 · 오른쪽은 넣은 시각 · 오전 8시 전은 전날 영업으로 셉니다</p>
     <button class="big-btn sec" data-tab="t-food">🥬 식자재 발주하러 가기</button>`;
+}
+
+/* ══════════════ 🥩 고기 입고 (26-11-01) ══════════════
+   사장님 「11월달부터 백석처럼 고기 입고 넣어서 자동 손익계산서 만들기. (백석과 다르게 발주는 필요없고 입고만 동일하게)」
+   → 백석 직원앱 고기 탭의 「입고」 칸만 가져옴 · 원당 발주 GAS {type:'stock'} → 입고기록_원당 탭 → 손익 새벽 고기값 (단가는 백석과 같은 표)
+   ⚠️ 같은 날 다시 보내면 정정 — 앞 것은 「대체됨」, 고기값은 마지막 것만 (백석과 같음)
+   ⚠️ 「보냈다」는 서버가 진실 (?action=meatToday) — 두 폰이 같이 봄 · 보낸 직후 20초는 서버를 안 믿음 (시트에 아직 안 찍혔을 수 있음) */
+const MEAT_EXTRAS=['벌집양','천엽','간','간(반)','내장'];
+let meatOp=0;
+async function readMeat(){
+  if(!LIVE) return;
+  const r=await API.jsonp(STORE.orderGas,{action:'meatToday'},9000); if(!r||!r.ok) return;
+  if(Date.now()-meatOp<20000) return;
+  const st=r.stock||null; if(st===S.meat.sent) return;
+  S.meat.sent=st; save(); if(cur==='t-meat') rMeat();
+}
+function meatMsg(){ const m=S.meat, d=`${BD.getMonth()+1}/${BD.getDate()}(${DAY[BD.getDay()]})`;
+  return `[원당 고기 입고] ${d}\n곱창 ${m.gc}보 · 대창 ${m.dc}보 · 막창 ${m.mc}보\n박스 ${m.box}개${m.extras.length?'\n기타: '+m.extras.join(', '):''}`; }
+function rMeat(){
+  const m=S.meat, 칸=(k,l,u)=>`<div class="row"><span class="main">${l}</span><span class="qty"><button data-act="mq" data-k="${k}" data-d="-1" aria-label="${l} 줄이기">−</button><output class="num">${m[k]}</output><button data-act="mq" data-k="${k}" data-d="1" aria-label="${l} 늘리기">+</button></span><span class="mut" style="width:18px">${u}</span></div>`;
+  $('#t-meat').innerHTML = (m.sent?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${esc(m.sent)}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
+    + `<h2>오늘 들어온 고기</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
+    <div class="list">${칸('gc','곱창','보')}${칸('dc','대창','보')}${칸('mc','막창','보')}${칸('box','박스','개')}</div>
+    <h2>기타 입고</h2><div class="chips">${MEAT_EXTRAS.map(x=>`<button class="chip" data-act="mx" data-v="${x}" aria-pressed="${m.extras.includes(x)}">${x}</button>`).join('')}</div>
+    <button class="big-btn" data-act="msend" style="margin-top:16px;${m.sent?'background:var(--warm)':''}">${m.sent?'✏️ 정정해서 보내기':'입고 보내기'}</button>
+    <p class="hint" style="text-align:center;margin-top:10px">보낸 수량으로 손익계산서 고기값이 새벽에 자동으로 잡힙니다</p>`;
 }
 
 /* ══════════════ 🥬 식자재 발주 ══════════════
@@ -615,6 +643,20 @@ document.addEventListener('click', async e=>{
     case 'sup': S.food.sup=b.dataset.v; save(); rerender(); break;
     case 'fq': { const k=b.dataset.k, n=Math.max(0,(S.food.cart[k]||0)+(+b.dataset.d)); if(n) S.food.cart[k]=n; else delete S.food.cart[k]; save(); rerender(); break; }
     case 'fpreview': 미리보기(); break;
+    /* 🥩 고기 입고 */
+    case 'mq': { const k=b.dataset.k; S.meat[k]=Math.max(0,(+S.meat[k]||0)+(+b.dataset.d)); save(); rMeat(); break; }
+    case 'mx': { const x=b.dataset.v, a=S.meat.extras, i=a.indexOf(x); i<0?a.push(x):a.splice(i,1); save(); rMeat(); break; }
+    case 'msend': { const m=S.meat; if(!(m.gc||m.dc||m.mc||m.box||m.extras.length)){ toast('입고 내역을 하나 이상 적어 주세요'); break; }
+      openSheet(`<h2>${m.sent?'✏️ 정정 — ':''}입고 확인</h2>${m.sent?`<div class="banner warn"><span class="em">⚠️</span><div><b>오늘 이미 보낸 입고가 있습니다</b><span>이걸 보내면 앞서 보낸 것 대신 이것으로 고기값이 잡힙니다</span></div></div>`:''}
+        <div class="list"><div class="row"><span class="main" style="white-space:pre-line">${esc(meatMsg())}</span></div></div>
+        <button class="big-btn" data-act="msendok" ${m.sent?'style="background:var(--warm)"':''}>${m.sent?'정정 보내기':'입고 보내기'}</button><button class="big-btn sec" data-act="close">고치기</button>`); break; }
+    case 'msendok': { if(b.disabled) break; b.disabled=true; const m=S.meat;
+      const body={type:'stock',branch:'wondang',gc:m.gc,dc:m.dc,mc:m.mc,bs:m.box,extras:m.extras.slice(),date:BD_KEY};
+      const sig='meat:'+JSON.stringify(body);
+      if(recentSame(sig)){ closeSheet(); toast('방금 똑같은 내용이 이미 들어갔습니다'); break; }
+      markSent(sig); m.sent=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rMeat(); toast('🥩 입고 보냄');
+      API.post(STORE.orderGas, body).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다. 20초 뒤 상태를 보세요'));
+      break; }
     case 'fsend': 보내기(b); break;
     case 'cl': 청소누름(b); break;
     case 'pushon': turnPushOn(); break;
