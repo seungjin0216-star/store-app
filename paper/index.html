@@ -725,8 +725,11 @@ paper.addEventListener('pointerdown', e => {
   }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (drag) return;
-  if (pen !== null) endPen();   // 앞 획의 「뗐다」를 놓쳤으면 여기서 끝냄
   e.preventDefault();
+  startPen(e);
+});
+function startPen(e) {
+  if (pen !== null) endPen();   // 앞 획의 「뗐다」를 놓쳤으면 여기서 끝냄
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   try { paper.setPointerCapture(e.pointerId); } catch (_) {}
   pen = e.pointerId; penSeen = performance.now(); pan = null; fingers.clear(); twoTap = null;
@@ -737,15 +740,23 @@ paper.addEventListener('pointerdown', e => {
   else live = { t:'pen', c: st.color, w: SIZES.pen[st.size], k: st.kind, p:[] };
   if (e.pointerType !== 'pen') live.m = 1;   // 마우스·손가락은 필압이 없음 → 속도로 흉내
   addPt(e); paintLive();   // 첫 점은 다음 화면까지 안 기다리고 바로
-});
+}
 paper.addEventListener('pointermove', e => {
   if (drag && e.pointerId === drag.id) {
     const [x, y] = pt(e); sel.dx = x - drag.from[0]; sel.dy = y - drag.from[1];
     frame(paintAll, 'drag'); return;
   }
+  // 🔴 26-11-01 사장님 「펜슬쓰다가 갑자기 안나옴 … 펜슬 홈(이중 탭)이 감지되면 아예 안나오는것같음. 무조건 그냥 쓰게끔」
+  //   아이패드가 펜을 잠깐 가져가면(이중 탭·손글씨 인식 등) 「펜 대기」 없이 「취소」만 오고 획이 끊김
+  //   → 펜이 화면에 닿아 움직이는데 쓰는 중이 아니면 그 자리에서 새 획을 시작 (펜 대기 소식을 기다리지 않음)
+  if (pen === null && e.pointerType === 'pen' && (e.buttons & 1) && e.pressure > 0 && !drag && !sel
+      && !e.target.closest('#selbar,.sh')) { startPen(e); return; }
   if (e.pointerId === pen) {
     penSeen = performance.now();
-    if (e.pointerType !== 'touch' && e.buttons === 0) return endPen();   // 펜이 이미 떨어짐 (떼는 소식을 놓침)
+    // 펜이 이미 떨어짐 (떼는 소식을 놓침) — 닿아 있으면 눌림·압력이 있으니 둘 다 0 일 때만
+    //   (눌림 표시 하나만 보고 끊으면 쓰는 중에 갑자기 끊길 수 있음)
+    if (e.pointerType === 'pen' && e.buttons === 0 && !e.pressure) return endPen();
+    if (e.pointerType === 'mouse' && e.buttons === 0) return endPen();
     if (erased) eraseAt(e);
     else if (lasso) { for (const ev of evsOf(e)) lasso.push(pt(ev)); frame(paintLive); }
     else if (live) { addPt(e); frame(paintLive); }
