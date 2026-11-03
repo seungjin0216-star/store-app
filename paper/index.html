@@ -52,6 +52,7 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
   -webkit-user-select:text;user-select:text}
 .sh .sh-w{color:var(--accent);border-color:#e9b9a3}
 .sh .sh-w.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.sh .sh-tag{color:var(--accent);font-weight:700;font-size:14px;white-space:nowrap}
 .sh .sh-x{margin-left:auto;color:var(--mute);min-width:36px;height:36px;font-size:13px}
 #selbar{position:absolute;display:none;gap:4px;background:#26231f;border-radius:12px;padding:4px;z-index:5;box-shadow:0 4px 16px #0003}
 #selbar.show{display:flex}
@@ -77,7 +78,7 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
 .rows .t{flex:1}
 .rows .c{color:var(--mute);font-size:13px}
 .rows .w{background:var(--accent);color:#fff;border-radius:10px;padding:1px 8px;font-size:13px;font-weight:700}
-#list{position:fixed;inset:0;z-index:10;background:#f6f3ed;display:none;flex-direction:column}
+#list{position:fixed;inset:0;z-index:14;background:#f6f3ed;display:none;flex-direction:column}
 #list.show{display:flex}
 #list>header{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;border-bottom:1px solid var(--line)}
 #lsub{display:flex;align-items:center;gap:8px;padding:10px 16px 0;flex-wrap:wrap}
@@ -145,7 +146,7 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
 <body>
 <header id="bar">
   <div class="grp">
-    <button id="bList" aria-label="모든 장 · 오답노트"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
+    <button id="bList" class="chip">📒 오답노트</button>
   </div>
   <div class="grp" id="tools">
     <button data-tool="pc" aria-label="연습 연필"><svg viewBox="0 0 24 24" style="stroke:#6e7177"><path d="M16.5 3.5l4 4L8 20H4v-4z"/><path d="M14 6l4 4"/><path d="M4 16l4 4" stroke-width="2.6"/></svg></button>
@@ -168,14 +169,10 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
   </div>
   <div class="grp">
     <button id="wipe" class="chip">연습 지우기</button>
-    <button id="addQ" class="chip">＋ 문제</button>
+    <button id="fresh" class="chip">새 문제</button>
+    <button id="home" class="chip">← 연습장</button>
   </div>
   <div class="grp"><button id="tm" aria-label="이 장 시간 재기">▶ 00:00</button></div>
-  <div class="grp">
-    <button id="prev" aria-label="앞 장"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <span id="pn">1 / 1</span>
-    <button id="next" aria-label="뒷 장"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
-  </div>
   <div class="grp">
     <button id="calcBtn" aria-label="계산기"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="8" y="6" width="8" height="3"/><path d="M8.5 13h0M12 13h0M15.5 13h0M8.5 17h0M12 17h0M15.5 17h0" stroke-width="2.4"/></svg></button>
     <button id="more" aria-label="더 보기"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
@@ -206,7 +203,6 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
   <h4>펜 느낌 (검정·파랑·빨강 펜)</h4>
   <div class="row"><button data-kind="ball">볼펜</button><button data-kind="fount">만년필</button><button data-kind="sign">사인펜</button></div>
   <hr>
-  <button id="newPage">＋ 새 장 (다른 과목·다른 날)</button>
   <button id="tmReset">이 장 시간 0으로</button>
   <hr>
   <button id="share">이 장을 사진으로 내보내기</button>
@@ -222,9 +218,9 @@ button.on .dot{box-shadow:0 0 0 2px var(--bar),0 0 0 4px var(--onT)}
 
 <section id="list">
   <header>
-    <div class="tabs" id="lTabs"><button data-view="all">모든 장</button><button data-view="wrong">오답노트</button></div>
+    <div class="tabs" id="lTabs"><button data-view="wrong">오답노트</button><button data-view="old">옛 장</button></div>
     <span style="flex:1"></span>
-    <button id="add2" class="chip">＋ 새 장</button><button id="closeList">닫기</button>
+    <button id="closeList">닫기</button>
   </header>
   <div id="lsub"></div>
   <div id="grid"></div>
@@ -330,12 +326,33 @@ function pref(k, v) {
    사장님 「스크롤이 최대한 되었으면 … 각 문제별로 오답노트로 가기가 어렵게 되있음」
    칸 = { y(머리줄 위치), subj, ch, q(문제 번호), wrong } — 칸은 다음 칸 머리줄까지 */
 function newQ(y, from) { return { id: uid(), y, subj: from ? from.subj : '', ch: from ? from.ch ?? null : null, q:'', wrong:false, wrongAt:0 }; }
-function newPage(from) {
+function newPage(from, kind) {
   const last = from ? from.qs[from.qs.length - 1] : null;
-  return { id: uid(), created: Date.now(), upd: Date.now(), title:'', bg: from ? from.bg : 'line', h: PAGE,
+  return { id: uid(), kind, created: Date.now(), upd: Date.now(), title:'', bg: from ? from.bg : 'line', h: PAGE,
            qs:[newQ(0, last)], strokes:[], sec:0, run:0 };
 }
+/* 🔴 26-11-03 바뀜 — 사장님 「메인이 되는 연습장 한 페이지와 나머지는 전부 오답노트로」
+   「메인이 되는 연습장에서 문제풀이후 해당 페이지에서 오답노트 작성. 오답노트로 보내면 해당페이지가 오답노트로 가고 다시 메인이 되는 연습장」
+   장의 종류 p.kind
+     main  연습장 — 딱 한 장. 머리줄 하나(과목·장·번호) · 「오답노트로 보내기」 / 「새 문제」로 비움
+     note  오답노트 한 장 — 보낼 때 연습장 글씨를 복사해 만듦 (머리줄 y=0 · wrong 표시)
+     old   26-11-03 전의 장 — 지우지 않고 「옛 장」에 보관 (★ 표시 칸은 처음 열 때 note 로 복사해 옮김)
+     void  보내기를 되돌린 note — 지우지 않고 숨김 (규칙 ④) */
 const P = () => pages[cur];
+const MAIN = () => pages.find(p => p.kind === 'main');
+// 칸 하나(또는 연습장 전체)를 오답노트 한 장으로 복사 — 획은 머리줄이 맨 위(y=0)가 되게 올림
+function makeNote(p, i, whole) {
+  const q = p.qs[i], [y0, y1r] = qRange(p, i), y1 = whole ? Infinity : y1r;
+  const ss = p.strokes.filter(s => s.p[1] >= y0 && s.p[1] < y1).map(s => {
+    const c = { ...s, p: s.p.slice() };
+    if (y0) for (let j = 1; j < c.p.length; j += 3) c.p[j] = +(c.p[j] - y0).toFixed(2);
+    return c;
+  });
+  const n = { id: uid(), kind:'note', src: p.id + ':' + q.id, created: Date.now(), upd: Date.now(), title:'', bg: p.bg, h: PAGE,
+              qs:[{ ...q, id: uid(), y:0, wrong:true, wrongAt: q.wrongAt || Date.now(), sent: undefined }], strokes: ss, sec:0, run:0 };
+  n.h = Math.max(PAGE, Math.ceil((inkMax(n) + 400) / 100) * 100);
+  return n;
+}
 function H_() { const id = P().id; if (!hist.has(id)) hist.set(id, { u:[], r:[] }); return hist.get(id); }
 function inkMax(p, from = -1) {
   let b = 0;
@@ -503,22 +520,24 @@ function renderHeads() {
     const d = document.createElement('div'); d.className = 'sh';
     // 문제 번호는 평소엔 단추 · 누를 때만 글 칸 — 글 칸이 늘 떠 있으면 근처에 쓴 펜슬 글씨를
     // 아이패드 「손글씨 → 글자」(Scribble)가 가져가서 「펜슬이 안 먹힘」이 됨 (26-11-01)
+    const kind = P().kind;
     d.innerHTML = '<button class="chip sh-ch"><span></span></button><button class="chip sh-q"></button>'
-      + '<button class="chip sh-w"></button>' + (i ? '<button class="sh-x" aria-label="칸 나누기 없애기">✕ 칸</button>' : '');
+      + (kind === 'note' ? '<span class="sh-tag"></span>' : '<button class="chip sh-w"></button>')
+      + (kind === 'old' && i ? '<button class="sh-x" aria-label="칸 나누기 없애기">✕ 칸</button>' : '');
     const qb = d.querySelector('.sh-q');
     d.querySelector('.sh-ch').onclick = () => openPick(q);
     qb.onclick = () => editNo(q, qb);
-    d.querySelector('.sh-w').onclick = () => toggleWrong(q, qb);
-    if (i) d.querySelector('.sh-x').onclick = () => delQ(q);
+    if (kind !== 'note') d.querySelector('.sh-w').onclick = () => sendNote(q, qb);
+    if (kind === 'old' && i) d.querySelector('.sh-x').onclick = () => delQ(q);
     box.append(d); heads.push({ q, d });
     syncHead(q);
   });
   placeHeads();
 }
-function editNo(q, qb) {
+function editNo(q, qb, then) {
   const inp = document.createElement('input'); inp.className = 'sh-q'; inp.autocomplete = 'off'; inp.placeholder = '문제 번호';
   inp.value = q.q || '';
-  const done = () => { q.q = inp.value.trim(); touch(P()); if (inp.isConnected) inp.replaceWith(qb); syncHead(q); };
+  const done = () => { q.q = inp.value.trim(); touch(P()); if (inp.isConnected) inp.replaceWith(qb); syncHead(q); if (then && q.q) setTimeout(then); };
   inp.addEventListener('blur', done);
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
   qb.replaceWith(inp); inp.focus();
@@ -529,7 +548,10 @@ function syncHead(q) {
   if (qb) { qb.textContent = q.q ? (/\d$/.test(q.q) ? q.q + '번' : q.q) : '문제 번호'; qb.style.color = q.q ? '' : 'var(--mute)'; }
   const c = chOf(q);
   h.d.querySelector('.sh-ch span').textContent = q.subj ? short(q.subj) + (c ? ' ' + (c[0] === '부록' ? '부록 ' : +c[0] + '장 ') + c[1] : '') + ' ▾' : '과목·장 ▾';
-  const w = h.d.querySelector('.sh-w'); w.classList.toggle('on', !!q.wrong); w.textContent = q.wrong ? '★ 오답노트' : '☆ 오답노트';
+  const w = h.d.querySelector('.sh-w');
+  if (w) w.textContent = P().kind === 'main' ? '📤 오답노트로 보내기' : q.sent ? '✓ 보냄 · 또 보내기' : '📤 이 칸 오답노트로';
+  const tag = h.d.querySelector('.sh-tag');
+  if (tag) { const d = new Date(q.wrongAt || P().created); tag.textContent = '📒 오답노트 · ' + (d.getMonth() + 1) + '/' + d.getDate(); }
 }
 function placeHeads() {
   const vis = H / scale;
@@ -542,23 +564,11 @@ function placeHeads() {
     d.style.paddingLeft = (70 * scale + 8) + 'px';
   }
 }
-function addQ() {
-  const p = P(), last = p.qs[p.qs.length - 1];
-  const y = Math.round(Math.max(last.y + HH + 140, inkMax(p, last.y) + 50));
-  const q = newQ(y, last);
-  if (/^\d+$/.test(last.q || '')) q.q = String(+last.q + 1);   // 문제를 차례로 풀 때 번호 하나 올려 둠 (고칠 수 있음)
-  p.qs.push(q);
-  if (p.h < y + 1000) p.h = Math.ceil((y + 1200) / 100) * 100;
-  push({ a:'qAdd', q }); renderHeads(); paintAll();
-  setOff(y - 12);
-  toast('새 문제 칸 · ' + (label(q) || '번호를 적어주세요'));
-}
 function delQ(q) {
   if (!confirm('이 칸 나누기를 없앨까요?\n글씨는 그대로 남고 윗 칸에 붙습니다. (되돌리기 됨)')) return;
   const qs = P().qs, i = qs.indexOf(q); if (i <= 0) return;
   qs.splice(i, 1); push({ a:'qDel', q, i }); renderHeads(); paintAll();
 }
-$('#addQ').onclick = addQ;
 
 /* ── 올가미 ─────────────────────────────
    둘러싼 획 고르기 → 끌어서 옮기기 · 복제 · 지우기 (모두 되돌리기 됨)
@@ -606,6 +616,8 @@ function startDrag(e) {
   try { paper.setPointerCapture(e.pointerId); } catch (_) {}
 }
 function endDrag() {
+  if (!drag) return;
+  if (!sel) { drag = null; return; }
   const { dx, dy } = sel; drag = null;
   if (Math.abs(dx) < .5 && Math.abs(dy) < .5) { sel.dx = sel.dy = 0; return paintAll(); }
   sel.ss.forEach(s => shift(s, dx, dy));
@@ -707,10 +719,14 @@ paper.addEventListener('pointerdown', e => {
   closeMenu();
   if (e.target.closest('#selbar,.sh')) return;
   stopFling();
-  // 고른 것이 있으면: 상자 안을 누르면 (펜이든 손가락이든) 끌어서 옮기기 · 밖을 누르면 고르기 풀기
+  // 🔴 26-11-03 사장님 「가끔 안써지는 경우 … 다른 펜색을 누를때 다시 나오게」
+  //   원인: 올가미로 고른 것을 끌다가 「뗌」 소식을 놓치면 drag 가 남아 → 펜을 대도 무시 (펜 색 단추가 이걸 풀어서 다시 써졌음)
+  //   또 고른 상자 밖을 펜으로 누르면 「풀기만」 하고 그 획은 버렸음 → 사장님 눈엔 「안 써짐」
+  //   고침: 펜이 닿으면 남아 있던 끌기는 끝냄 · 상자 밖이면 고르기를 풀고 그대로 씀
+  if (e.pointerType !== 'touch' && drag) endDrag();
   if (sel && !drag && pen === null && (e.pointerType !== 'touch' || Date.now() - lastPen > 500)) {
     if (inSel(...pt(e))) { e.preventDefault(); return startDrag(e); }
-    if (e.pointerType !== 'touch') { clearSel(); if (st.tool !== 'lasso') return; }
+    if (e.pointerType !== 'touch') clearSel();
   }
   if (e.pointerType === 'touch') {
     // 손바닥 막기: 펜을 쓰는 중이거나 방금 썼으면 · 넓게 닿으면 무시
@@ -728,6 +744,11 @@ paper.addEventListener('pointerdown', e => {
   e.preventDefault();
   startPen(e);
 });
+// 글 칸(문제 번호)에 커서가 남아 있으면 아이패드가 펜슬 글씨를 그 칸 입력으로 가져갈 수 있음 → 펜이 닿는 순간 칸을 닫음
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'pen' && document.activeElement && document.activeElement.tagName === 'INPUT' && e.target !== document.activeElement)
+    document.activeElement.blur();
+}, true);
 function startPen(e) {
   if (pen !== null) endPen();   // 앞 획의 「뗐다」를 놓쳤으면 여기서 끝냄
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -749,8 +770,8 @@ paper.addEventListener('pointermove', e => {
   // 🔴 26-11-01 사장님 「펜슬쓰다가 갑자기 안나옴 … 펜슬 홈(이중 탭)이 감지되면 아예 안나오는것같음. 무조건 그냥 쓰게끔」
   //   아이패드가 펜을 잠깐 가져가면(이중 탭·손글씨 인식 등) 「펜 대기」 없이 「취소」만 오고 획이 끊김
   //   → 펜이 화면에 닿아 움직이는데 쓰는 중이 아니면 그 자리에서 새 획을 시작 (펜 대기 소식을 기다리지 않음)
-  if (pen === null && e.pointerType === 'pen' && (e.buttons & 1) && e.pressure > 0 && !drag && !sel
-      && !e.target.closest('#selbar,.sh')) { startPen(e); return; }
+  if (pen === null && e.pointerType === 'pen' && (e.buttons & 1) && e.pressure > 0 && !(drag && drag.id === e.pointerId)
+      && !e.target.closest('#selbar,.sh')) { if (drag) endDrag(); clearSel(); startPen(e); return; }
   if (e.pointerId === pen) {
     penSeen = performance.now();
     // 펜이 이미 떨어짐 (떼는 소식을 놓침) — 닿아 있으면 눌림·압력이 있으니 둘 다 0 일 때만
@@ -825,6 +846,12 @@ function apply(op, back) {
   else if (op.a === 'move') { const k = back ? -1 : 1; op.ss.forEach(s => shift(s, op.dx * k, op.dy * k)); }
   else if (op.a === 'addMany') {
     if (back) op.ss.forEach(s => { const i = ss.indexOf(s); if (i >= 0) ss.splice(i, 1); }); else ss.push(...op.ss);
+  } else if (op.a === 'send') {
+    const q = p.qs[0];
+    if (back) { op.n.kind = 'void'; p.strokes = op.s; p.sec = op.sec; p.h = op.h; q.q = op.q0; }
+    else { op.n.kind = 'note'; p.strokes = []; p.sec = 0; p.h = PAGE; q.q = op.q1; }
+    touch(op.n); renderHeads();
+    toast(back ? '보내기를 되돌렸습니다 (보낸 노트는 숨김)' : '다시 보냈습니다');
   } else if (op.a === 'qAdd') {
     if (back) { const i = p.qs.indexOf(op.q); if (i > 0) p.qs.splice(i, 1); } else { p.qs.push(op.q); p.qs.sort((a, b) => a.y - b.y); }
     renderHeads();
@@ -851,9 +878,9 @@ function syncBtns() {
   document.querySelectorAll('#sizes button').forEach(b => b.classList.toggle('on', +b.dataset.size === st.size));
   $('#sizes').style.visibility = st.tool === 'er' || st.tool === 'lasso' ? 'hidden' : '';
   const h = H_(); $('#undo').disabled = !h.u.length; $('#redo').disabled = !h.r.length;
-  $('#pn').textContent = (cur + 1) + ' / ' + pages.length;
-  $('#prev').disabled = cur === 0;
-  $('#next').disabled = cur === pages.length - 1;
+  const k = P().kind;
+  $('#fresh').style.display = k === 'main' ? '' : 'none';
+  $('#home').style.display = k === 'main' ? 'none' : '';
   document.querySelectorAll('#menu [data-bg]').forEach(b => b.classList.toggle('on', b.dataset.bg === P().bg));
   document.querySelectorAll('#menu [data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === st.kind));
 }
@@ -871,13 +898,22 @@ function go(i, y) {
   cur = i; pref('page', P().id);
   renderHeads(); syncBtns(); setOff(y || 0); tick();
 }
-$('#prev').onclick = () => go(cur - 1);
-$('#next').onclick = () => go(cur + 1);
-function addPage() { const p = newPage(P()); pages.push(p); touch(p); go(pages.length - 1); toast('새 장'); }
+$('#home').onclick = () => go(pages.indexOf(MAIN()));
+// 새 문제 = 연습장을 비우고 번호 +1 (보내지 않고 넘어갈 때 · 되돌리기로 살릴 수 있음)
+$('#fresh').onclick = () => {
+  const p = P(); if (p.kind !== 'main') return;
+  const q = p.qs[0];
+  pauseTimer();
+  if (p.strokes.length) push({ a:'clear', s: p.strokes.slice() });
+  p.strokes = []; p.sec = 0; p.h = PAGE; sel = null;
+  if (/^\d+$/.test(q.q || '')) q.q = String(+q.q + 1);
+  touch(p); syncHead(q); setOff(0); paintAll(); tick();
+  toast('새 문제' + (q.q ? ' · ' + label(q) : '') + ' — 앞 문제는 되돌리기로 살릴 수 있어요');
+};
 
 /* ── 과목·장 고르기 ─────────────────────────────── */
-let pickSubj = '재무회계', pickQ = null;
-function openPick(q) { pickQ = q; pickSubj = q.subj || pickSubj; renderPick(); $('#pick').classList.add('show'); }
+let pickSubj = '재무회계', pickQ = null, pickThen = null;
+function openPick(q, then) { pickQ = q; pickThen = then || null; pickSubj = q.subj || pickSubj; renderPick(); $('#pick').classList.add('show'); }
 function closePick() { $('#pick').classList.remove('show'); }
 function renderPick() {
   const q = pickQ;
@@ -894,7 +930,7 @@ function renderPick() {
     b.querySelector('.n').textContent = n; b.querySelector('.t').textContent = t; b.querySelector('.c').textContent = c;
     b.onclick = fn; L.append(b);
   };
-  const set = (subj, ch) => { q.subj = subj; q.ch = ch; touch(P()); syncHead(q); closePick(); };
+  const set = (subj, ch) => { q.subj = subj; q.ch = ch; touch(P()); syncHead(q); closePick(); const t = pickThen; pickThen = null; if (t && subj) setTimeout(t); };
   const book = BOOKS[pickSubj];
   if (!book.length) row('', pickSubj + ' — 목차는 나중에 넣습니다. 과목만 정하기', '', q.subj === pickSubj, () => set(pickSubj, null));
   book.forEach((c, i) => row(c[0] === '부록' ? '부록' : '제' + c[0] + '장', c[1], c[2] ? c[2] + '문제' : '',
@@ -904,15 +940,25 @@ function renderPick() {
 $('#pickClose').onclick = closePick;
 $('#pick').addEventListener('click', e => { if (e.target.id === 'pick') closePick(); });
 
-/* ── 오답노트 ─────────────────────────────
-   문제 칸에 「오답」 표시만 함 (복사하지 않음 → 풀이와 오답노트가 어긋나지 않음)
-   모아 보기: ☰ → 오답노트 → 과목 → 목차 → 장 → 그 장의 오답 칸들이 문제 번호 순으로 한 줄로 이어짐 */
-function toggleWrong(q, qb) {
-  q.wrong = !q.wrong; q.wrongAt = q.wrong ? Date.now() : 0; touch(P()); syncHead(q); paintAll();
-  if (!q.wrong) return toast('오답노트에서 뺐습니다');
-  if (!q.subj || (BOOKS[q.subj].length && q.ch == null)) { toast('어느 장 문제인지 골라주세요'); openPick(q); }
-  else if (!q.q) { toast('문제 번호도 적어주세요'); editNo(q, qb); }
-  else toast('오답노트에 넣었습니다 · ' + label(q));
+/* ── 오답노트로 보내기 ─────────────────────────────
+   연습장: 그 장 글씨 전부를 오답노트 한 장으로 복사 → 연습장은 비우고 번호 +1 (되돌리기 = 보낸 노트를 숨기고 글씨를 되살림)
+   옛 장: 그 칸만 복사 (옛 장은 그대로) */
+function sendNote(q, qb) {
+  const p = P(), i = p.qs.indexOf(q), again = () => sendNote(q, qb);
+  const [y0, y1] = qRange(p, i);
+  if (!p.strokes.some(s => s.p[1] >= y0 && (p.kind === 'main' || s.p[1] < y1))) return toast('보낼 글씨가 없습니다');
+  if (!q.subj || (BOOKS[q.subj].length && q.ch == null)) { toast('어느 장 문제인지 먼저 골라주세요'); return openPick(q, again); }
+  if (!q.q) { toast('문제 번호를 먼저 적어주세요'); return editNo(q, qb, again); }
+  pauseTimer(); sel = null;
+  const n = makeNote(p, i, p.kind === 'main');
+  pages.push(n); touch(n);
+  if (p.kind === 'main') {
+    n.sec = p.sec; n.created = Date.now(); n.qs[0].wrongAt = Date.now();
+    const op = { a:'send', n, s: p.strokes, sec: p.sec, h: p.h, q0: q.q, q1: /^\d+$/.test(q.q) ? String(+q.q + 1) : '' };
+    p.strokes = []; p.sec = 0; p.h = PAGE; q.q = op.q1; q.id = uid();
+    push(op); syncHead(q); setOff(0); paintAll(); tick();
+    toast('오답노트로 보냈습니다 · ' + label(n.qs[0]) + ' — 연습장은 새로');
+  } else { q.sent = true; touch(p); syncHead(q); toast('이 칸을 오답노트로 보냈습니다 · ' + label(n.qs[0])); }
 }
 
 /* ── 시간 (장마다) ─────────────────────────────── */
@@ -938,7 +984,6 @@ document.querySelectorAll('#menu [data-kind]').forEach(b => b.onclick = () => {
   if (st.tool !== 'pen') st.tool = 'pen';
   syncBtns(); toast(b.textContent + ' 느낌 · 새로 쓰는 글씨부터');
 });
-$('#newPage').onclick = () => { closeMenu(); addPage(); };
 $('#tmReset').onclick = () => { if (!confirm('이 장의 시간을 0으로 할까요?')) return; const p = P(); p.sec = 0; p.run = 0; touch(p); tick(); closeMenu(); };
 $('#clear').onclick = () => {
   const p = P(); if (!p.strokes.length) return closeMenu();
@@ -966,7 +1011,7 @@ $('#share').onclick = async () => {
 document.addEventListener('pointerdown', e => { if (!e.target.closest('#menu,#more')) closeMenu(); });
 
 /* ── 모든 장 · 오답노트 ─────────────────────────────── */
-const lv = { view:'all', subj:'재무회계', ch:undefined };   // ch: undefined = 목차, null = 장 미정, 숫자 = 그 장
+const lv = { view:'wrong', subj:'재무회계', ch:undefined };   // ch: undefined = 목차, null = 장 미정, 숫자 = 그 장
 let noteObs = null;
 function card(p) {
   const i = pages.indexOf(p);
@@ -988,7 +1033,7 @@ function noteEl(it) {
   b.innerHTML = '<div class="nh"><b></b><small></small></div>';
   b.querySelector('b').textContent = label(q) || '번호 없음';
   const d = new Date(q.wrongAt || p.created);
-  b.querySelector('small').textContent = (pages.indexOf(p) + 1) + '번째 장 · ' + (d.getMonth() + 1) + '/' + d.getDate() + ' 오답';
+  b.querySelector('small').textContent = (d.getMonth() + 1) + '/' + d.getDate() + ' 보냄' + (p.sec ? ' · 푼 시간 ' + fmt(p.sec) : '');
   const c = document.createElement('canvas'); c.width = c.height = 0; b.append(c);   // 0 = 아직 안 그림 (그림판 기본 크기 300 이면 안 그려짐)
   const cw = Math.min(900, $('#grid').clientWidth - 32), k = cw / LW;
   c.style.height = Math.round((y1 - y0) * k) + 'px';
@@ -1010,10 +1055,14 @@ function renderList() {
     if (e.isIntersecting) { if (!c.width) c._draw(); } else { c.width = 0; c.height = 0; }
   }), { root: g, rootMargin: '800px 0px' });
   document.querySelectorAll('#lTabs button').forEach(b => b.classList.toggle('on', b.dataset.view === lv.view));
-  if (lv.view === 'all') { pages.forEach(p => g.append(card(p))); return; }
+  if (lv.view === 'old') {
+    const old = pages.filter(p => p.kind === 'old').reverse();
+    sub.insertAdjacentHTML('beforeend', '<small style="color:var(--mute)">26-11-03 전에 쓰던 장 — 지우지 않고 보관 · ★ 칸은 오답노트로 옮겨 둠 · 빠진 칸은 그 칸의 「📤 이 칸 오답노트로」</small>');
+    if (!old.length) g.insertAdjacentHTML('beforeend', '<div class="empty">없습니다</div>');
+    old.forEach(p => g.append(card(p))); return;
+  }
 
-  const wrong = [];
-  pages.forEach(p => p.qs.forEach(q => { if (q.wrong) wrong.push({ p, q }); }));
+  const wrong = pages.filter(p => p.kind === 'note').map(p => ({ p, q: p.qs[0] }));
   const tabs = document.createElement('div'); tabs.className = 'tabs';
   SUBJ.forEach(s => {
     const b = document.createElement('button'), n = wrong.filter(w => w.q.subj === s).length;
@@ -1070,7 +1119,6 @@ function closeList() { $('#list').classList.remove('show'); if (noteObs) noteObs
 document.querySelectorAll('#lTabs button').forEach(b => b.onclick = () => { lv.view = b.dataset.view; lv.ch = undefined; renderList(); });
 $('#bList').onclick = () => openList();
 $('#closeList').onclick = closeList;
-$('#add2').onclick = () => { closeList(); addPage(); };
 
 /* ── 계산기 — 카시오 JS-40B ─────────────────────────────
    26-11-01 사장님 「세무사시험에는 계산기가 필요해 … 카시오 js-40b … 기능과 생김새가 유사하게 · 크기조절」
@@ -1261,11 +1309,31 @@ new ResizeObserver(resize).observe(paper);
     if (!p.h) p.h = PAGE;
     if (!p.qs) p.qs = [{ id: uid(), y:0, subj: p.subj || '', ch: p.ch ?? null, q: (p.q !== undefined ? p.q : p.title) || '', wrong: !!p.wrong, wrongAt: p.wrongAt || 0 }];
   });
-  if (!pages.length) { const p = newPage(); pages.push(p); touch(p); }
-  const t = pref('tool'), c = pref('color'), s = pref('size'), k = pref('kind'), last = pref('page');
+  // 26-11-03 연습장 한 장 + 오답노트로 옮기기 (처음 한 번 · 지우는 것 없음)
+  //   종류(kind)가 없는 장 = 옛 장 → ★(wrong) 칸마다 오답노트 한 장으로 복사 → 그 장은 「옛 장」(old) 으로 보관
+  //   같은 칸을 두 번 옮기지 않게 src(장 id:칸 id)로 확인
+  const moved = [];
+  for (const p of pages.filter(p => !p.kind)) {
+    p.run && (p.sec = secOf(p), p.run = 0);
+    p.qs.forEach((q, i) => {
+      if (!q.wrong || pages.some(n => n.src === p.id + ':' + q.id)) return;
+      const n = makeNote(p, i, false);
+      n.created = q.wrongAt || p.created;
+      if (p.qs.length === 1) n.sec = p.sec;   // 칸이 하나뿐인 장이면 그 장 시간이 곧 그 문제 시간
+      moved.push(n); q.sent = true;
+    });
+    p.kind = 'old'; touch(p);
+  }
+  moved.forEach(n => { pages.push(n); touch(n); });
+  if (!MAIN()) {
+    const last = pages.filter(p => p.kind !== 'void').sort((a, b) => (b.upd || 0) - (a.upd || 0))[0];
+    const m = newPage(last, 'main'); m.qs[0].q = ''; pages.push(m); touch(m);
+    if (moved.length) setTimeout(() => toast('정리했습니다 — ★ 표시 ' + moved.length + '문제를 오답노트로 · 옛 장은 「옛 장」에 보관'), 600);
+  }
+  flush();
+  const t = pref('tool'), c = pref('color'), s = pref('size'), k = pref('kind');
   if (t) st.tool = t; if (c) st.color = c; if (s !== null && s !== undefined) st.size = +s; if (k && KIND[k]) st.kind = k;
-  const i = pages.findIndex(p => p.id === last);
-  cur = i >= 0 ? i : pages.length - 1;
+  cur = pages.indexOf(MAIN());   // 늘 연습장에서 시작
   renderHeads(); resize(); syncBtns(); tick();
   if (cpos.open) setCalc(true);
 })();
