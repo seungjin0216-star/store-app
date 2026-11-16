@@ -276,7 +276,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-11-16-w8';
+const APP_VERSION = '2026-11-16-w9';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -428,6 +428,9 @@ async function readMeat(){
   const 방금보냄 = S.meat.sentAt && Date.now()-S.meat.sentAt < 10*60e3;
   if(!st && 방금보냄){ S.meat.sent=null; S.meat.fail=true; save(); if(cur==='t-meat') rMeat(); toast('⚠️ 입고가 서버에 안 들어갔습니다 — 다시 보내 주세요'); return; }
   if(st) S.meat.fail=false;
+  /* 🔔 26-11-16 사장님 「매장통합앱(사장, 원당)에서 알림 · 몇 일 몇 시 입고가 들어왔다고」 — 서버에 들어온 것을 확인한 뒤에만 사장앱으로 (같은 날·같은 시각 한 번 · 서버가 막음) */
+  if(st && 방금보냄 && S.meat.notified!==st && LIVE){ S.meat.notified=st;
+    fetch(STORE.pushApi+'?a=staffevent',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({code:STORE.code,type:'meat',day:BD_KEY,time:st,items:S.meat.last||'',fix:!!S.meat.wasFix})}).catch(()=>{}); }
   if(st===S.meat.sent) { save(); return; }
   S.meat.sent=st; save(); if(cur==='t-meat') rMeat();
 }
@@ -677,6 +680,7 @@ document.addEventListener('click', async e=>{
       const body={type:'stock',branch:'wondang',gc:m.gc,dc:m.dc,mc:m.mc,bs:m.box,extras:m.extras.slice(),date:BD_KEY};
       const sig='meat:'+JSON.stringify(body);
       if(recentSame(sig)){ closeSheet(); toast('방금 똑같은 내용이 이미 들어갔습니다'); break; }
+      m.last=[['gc','곱창'],['dc','대창'],['mc','막창'],['box','박스']].filter(([k])=>m[k]).map(([k,l])=>l+m[k]).concat(m.extras).join(' · '); m.wasFix=!!m.sent;
       markSent(sig); m.sent=hhmm(); m.sentAt=Date.now(); m.fail=false; meatOp=Date.now(); setTimeout(readMeat,21000); setTimeout(readMeat,60000); save(); closeSheet(); rMeat(); toast('🥩 입고 보냄 · 20초 뒤 서버 확인');
       API.post(STORE.orderGas, body).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다. 20초 뒤 상태를 보세요'));
       break; }
