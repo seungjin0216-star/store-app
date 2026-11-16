@@ -179,6 +179,10 @@ nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:
 .doc .e{font-size:26px;line-height:1}
 .doc small{color:var(--muted);font-size:12px}
 .doc{cursor:pointer}
+/* 📷 26-11-16 사장님 「영수증 올리는 것이 지금 기존 사진첩을 열어서 확인하는 것밖에 없어 · 백석은 사진첩·사진 찍기 전부 뜨는데 백석처럼」
+   ⚠️ 원당 폰(안드로이드로 보임)은 multiple 입력에서 사진첩만 띄움 → 「찍기」(capture) 와 「사진첩」(multiple) 을 따로 */
+.doc-two{display:flex;gap:6px;margin-top:8px;width:100%}
+.doc-btn{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 4px;font-size:14px;font-weight:700;background:var(--paper);cursor:pointer}
 .doc:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .doc.sel,.doc[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
 .field{width:100%;height:50px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:17px;padding:0 14px}
@@ -272,7 +276,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-11-14-w7';
+const APP_VERSION = '2026-11-16-w8';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -416,14 +420,22 @@ async function readMeat(){
   if(!LIVE) return;
   const r=await API.jsonp(STORE.orderGas,{action:'meatToday'},9000); if(!r||!r.ok) return;
   if(Date.now()-meatOp<20000) return;
-  const st=r.stock||null; if(st===S.meat.sent) return;
+  /* 🔍 26-11-16 사장님 「원당 고기 입고를 보냈다고 하는데 며칠 데이터가 비어 있어」
+     전에는 보낸 뒤 서버에 없으면 「보냄」 표시만 조용히 사라졌음 (조용한 실패) → 이제 빨간 경고 + 다시 보내기
+     ⚠️ 서버가 시각을 「Sat Dec 30 1899 15:57 …」 꼴로 줌 → 15:57 만 */
+  const 시분=v=>{ if(!v) return null; const m=String(v).match(/(\d{1,2}):(\d{2})/); return m?m[1].padStart(2,'0')+':'+m[2]:String(v); };
+  const st=시분(r.stock);
+  const 방금보냄 = S.meat.sentAt && Date.now()-S.meat.sentAt < 10*60e3;
+  if(!st && 방금보냄){ S.meat.sent=null; S.meat.fail=true; save(); if(cur==='t-meat') rMeat(); toast('⚠️ 입고가 서버에 안 들어갔습니다 — 다시 보내 주세요'); return; }
+  if(st) S.meat.fail=false;
+  if(st===S.meat.sent) { save(); return; }
   S.meat.sent=st; save(); if(cur==='t-meat') rMeat();
 }
 function meatMsg(){ const m=S.meat, d=`${BD.getMonth()+1}/${BD.getDate()}(${DAY[BD.getDay()]})`;
   return `[원당 고기 입고] ${d}\n곱창 ${m.gc}보 · 대창 ${m.dc}보 · 막창 ${m.mc}보\n박스 ${m.box}개${m.extras.length?'\n기타: '+m.extras.join(', '):''}`; }
 function rMeat(){
   const m=S.meat, 칸=(k,l,u)=>`<div class="row"><span class="main">${l}</span><span class="qty"><button data-act="mq" data-k="${k}" data-d="-1" aria-label="${l} 줄이기">−</button><output class="num">${m[k]}</output><button data-act="mq" data-k="${k}" data-d="1" aria-label="${l} 늘리기">+</button></span><span class="mut" style="width:18px">${u}</span></div>`;
-  $('#t-meat').innerHTML = (m.sent?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${esc(m.sent)}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
+  $('#t-meat').innerHTML = (m.fail&&!m.sent?`<div class="banner red"><span class="em">⚠️</span><div><b>입고가 서버에 안 들어갔습니다</b><span>인터넷이 끊겼을 수 있습니다. 수량을 확인하고 「입고 보내기」를 다시 눌러 주세요</span></div></div>`:'') + (m.sent?`<div class="banner green"><span class="em">✅</span><div><b>오늘 입고 보냄 · ${esc(m.sent)}</b><span>잘못 넣었으면 고쳐서 다시 보내세요. 앞 것 대신 이것으로 잡힙니다</span></div></div>`:'')
     + `<h2>오늘 들어온 고기</h2><p class="hint">실제로 받은 수량을 적어 주세요.</p>
     <div class="list">${칸('gc','곱창','보')}${칸('dc','대창','보')}${칸('mc','막창','보')}${칸('box','박스','개')}</div>
     <h2>기타 입고</h2><div class="chips">${MEAT_EXTRAS.map(x=>`<button class="chip" data-act="mx" data-v="${x}" aria-pressed="${m.extras.includes(x)}">${x}</button>`).join('')}</div>
@@ -526,8 +538,9 @@ function rRcpt(){
   const waiting=R.queue.filter(q=>q.status==='대기'&&q.b64).length, 준비=R.queue.filter(q=>q.status==='준비중').length;
   $('#t-rcpt').innerHTML = 영수증실패띠() + `
     ${API.RECEIPT_LIVE?'':'<div class="banner warn"><span class="em">👀</span><div><b>미리보기 화면</b><span>여기서는 실제로 안 올라갑니다. 깃허브 주소로 열면 바로 올라갑니다</span></div></div>'}
-    <h2>① 사진으로 올릴 것</h2><p class="hint">누르면 바로 카메라가 열립니다. <b>하루 ${하루한도}장까지</b> (오늘 ${오늘장수()}장 올림) — 새벽 분석이 하룻밤에 몇 장만 할 수 있어서입니다.</p>
-    <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<label class="doc ${R.doc===v?'sel':''}"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}</label>`).join('')}</div>
+    <h2>① 사진으로 올릴 것</h2><p class="hint">「📷 찍기」는 카메라 · 「🖼 사진첩」은 찍어 둔 사진. <b>하루 ${하루한도}장까지</b> (오늘 ${오늘장수()}장 올림) — 새벽 분석이 하룻밤에 몇 장만 할 수 있어서입니다.</p>
+    <div class="doc-grid">${DOC_TYPES.map(([v,e,l,s])=>`<div class="doc ${R.doc===v?'sel':''}"><span class="e">${e}</span><b>${l}</b>${s?`<small>${s}</small>`:''}
+      <div class="doc-two"><label class="doc-btn"><input type="file" accept="image/*" capture="environment" data-act="rcpt" data-v="${v}" hidden>📷 찍기</label><label class="doc-btn"><input type="file" accept="image/*" multiple data-act="rcpt" data-v="${v}" hidden>🖼 사진첩</label></div></div>`).join('')}</div>
     ${R.queue.length?`<h3>올릴 목록</h3><div class="list">${R.queue.map((q,i)=>`<div class="row">${q.thumb?`<img class="thumb" src="${q.thumb}" alt="">`:'<span class="thumb" style="display:inline-block;background:var(--line)"></span>'}<span class="main">${DOC_TYPES.find(d=>d[0]===q.docType)[2]}<span class="sub">${esc(q.fname)}</span>${q.err?`<span class="qerr">${esc(q.err)}</span>`:''}</span><span aria-label="${q.status}">${qIcon(q.status)}</span>${q.status==='대기'&&!R.running?`<button class="icon-btn" data-act="rdel" data-i="${i}" aria-label="빼기">✕</button>`:''}${q.status==='오류'&&q.b64&&!R.running?`<button class="icon-btn" data-act="rretry" data-i="${i}">다시</button>`:''}</div>`).join('')}</div>
       <button class="big-btn" data-act="rsubmit" ${(waiting||준비)&&!R.running?'':'disabled'}>${R.running?'올리는 중… (다른 탭으로 가도 됩니다)':준비&&!waiting?`사진 준비 중… (${준비}장)`:`모두 제출하기 (${waiting}장)${준비?` · ${준비}장 준비 중`:''}`}</button>`:''}
 
@@ -664,7 +677,7 @@ document.addEventListener('click', async e=>{
       const body={type:'stock',branch:'wondang',gc:m.gc,dc:m.dc,mc:m.mc,bs:m.box,extras:m.extras.slice(),date:BD_KEY};
       const sig='meat:'+JSON.stringify(body);
       if(recentSame(sig)){ closeSheet(); toast('방금 똑같은 내용이 이미 들어갔습니다'); break; }
-      markSent(sig); m.sent=hhmm(); meatOp=Date.now(); setTimeout(readMeat,21000); save(); closeSheet(); rMeat(); toast('🥩 입고 보냄');
+      markSent(sig); m.sent=hhmm(); m.sentAt=Date.now(); m.fail=false; meatOp=Date.now(); setTimeout(readMeat,21000); setTimeout(readMeat,60000); save(); closeSheet(); rMeat(); toast('🥩 입고 보냄 · 20초 뒤 서버 확인');
       API.post(STORE.orderGas, body).catch(()=>toast('⚠️ 인터넷이 끊겨 못 보냈을 수 있습니다. 20초 뒤 상태를 보세요'));
       break; }
     case 'fsend': 보내기(b); break;
