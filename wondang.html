@@ -179,6 +179,8 @@ nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 8px);width:8px;height:
 .doc .e{font-size:26px;line-height:1}
 .doc small{color:var(--muted);font-size:12px}
 .doc{cursor:pointer}
+.newver{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:40;background:var(--accent);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-weight:700;font-size:15px;box-shadow:0 4px 16px #0003;display:none;white-space:nowrap}
+.newver.show{display:block}
 /* 📷 26-11-16 사장님 「영수증 올리는 것이 지금 기존 사진첩을 열어서 확인하는 것밖에 없어 · 백석은 사진첩·사진 찍기 전부 뜨는데 백석처럼」
    ⚠️ 원당 폰(안드로이드로 보임)은 multiple 입력에서 사진첩만 띄움 → 「찍기」(capture) 와 「사진첩」(multiple) 을 따로 */
 .doc-two{display:flex;gap:6px;margin-top:8px;width:100%}
@@ -265,6 +267,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
 <nav class="tabs" aria-label="화면 이동"><div class="wrap" id="tabs"></div></nav>
 <div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<button class="newver" id="newver" type="button">🔄 새 버전이 나왔어요 · 눌러서 새로고침</button>
 <div id="upOv" role="status" aria-live="polite"><div class="up-sky"><span class="up-cloud">☁️</span><i class="up-rc"></i><i class="up-rc"></i><i class="up-rc"></i></div><b id="upN">영수증 택배 출발!</b><div class="up-t" id="upT"></div><div class="up-bar"><i id="upBar"></i></div><div class="up-warn" id="upW">📵 다 올라갈 때까지 화면을 끄지 마세요</div></div>
 
 
@@ -276,7 +279,7 @@ button:focus-visible,summary:focus-visible,.ghost:focus-within{outline:2px solid
       영수증 부분만 백석 것을 그대로 옮김 (백석에서 영수증을 고치면 여기도 같이 · store-app/APP.md 「원당」)
    서버  식자재 = 원당 발주 GAS (food_order · 바로 발송 · 연중무휴) · 청소 = 마감 GAS 월간(branch wondang) · 영수증 = 손익 GAS (원당점)
    ══════════════════════════════════════════════════════════ */
-const APP_VERSION = '2026-11-16-w9';
+const APP_VERSION = '2026-11-16-w10';
 const STORE = {
   name: '원당', code: 'wondang', branch: 'wondang', receiptStore: '원당점',
   orderGas: 'https://script.google.com/macros/s/AKfycbzy3T6DOFaOY3u35XY57V2LJQP8mdMU4_NSc85qV8Ww2mr1owqGCGB7qGq8RsdYJYZYYg/exec',
@@ -729,11 +732,25 @@ document.addEventListener('input', e=>{
   if(e.target.id==='rMemo'){ R.memo=e.target.value; }
 });
 
+/* 🔄 새 버전 확인 (26-11-16 · 백석 직원앱 v1 부터 있던 것을 원당에도)
+   사장님 「지금 갤럭시 홈 화면 바로가기해서 했는데 업데이트가 자동으로 안 됨?」 — 원당에는 이 확인이 빠져 있었음
+   서버의 이 파일을 다시 받아 APP_VERSION 이 다르면: 켤 때·10분마다 → 위에 띠 · 5분 넘게 가려졌다 돌아오면 → 저절로 새로고침
+   ⚠️ 입력 중(아래 판 열림)이면 저절로 새로고침하지 않고 띠만 */
+async function 새판(){ try{ const t=await (await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'})).text(); const m=t.match(/const APP_VERSION = '([^']+)'/); return m&&m[1]!==APP_VERSION; }catch(e){ return false; } }
+let 가려진때=0;
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='hidden'){ 가려진때=Date.now(); return; }
+  if(!LIVE) return;
+  const 오래=가려진때&&Date.now()-가려진때>5*60e3;
+  if(await 새판()){ if(오래&&!$('#ov').classList.contains('show')) setTimeout(()=>location.reload(),600); else $('#newver').classList.add('show'); }
+});
+$('#newver').addEventListener('click',()=>{ $('#newver').textContent='새로고침 중…'; setTimeout(()=>location.reload(),500); });
+
 /* ── 시작 ── */
 $('#dateLabel').textContent=`원당점 · ${BD.getMonth()+1}월 ${BD.getDate()}일 ${DAY[BD.getDay()]}요일 · ${APP_VERSION}`;
 if(LIVE) $('#modePill').hidden=true;
 go('t-home');
-if(LIVE){ loadClean(); setInterval(()=>{ if(document.visibilityState==='visible'&&cur==='t-home') loadOrders(); },60000); setTimeout(뒤확인,8000); setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
+if(LIVE){ setTimeout(async()=>{ if(await 새판()) $('#newver').classList.add('show'); },5000); setInterval(async()=>{ if(document.visibilityState==='visible'&&await 새판()) $('#newver').classList.add('show'); },10*60000); loadClean(); setInterval(()=>{ if(document.visibilityState==='visible'&&cur==='t-home') loadOrders(); },60000); setTimeout(뒤확인,8000); setInterval(()=>{ if(document.visibilityState==='visible') 뒤확인(); },60000);
   setInterval(()=>{ const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul'})); if(d.getHours()<8) d.setDate(d.getDate()-1);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; if(k!==BD_KEY) location.reload(); },60000); }
 </script>
